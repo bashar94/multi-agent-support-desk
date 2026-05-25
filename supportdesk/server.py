@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,6 +20,7 @@ from supportdesk.defaults import (
     FRONTEND_DIR,
 )
 from supportdesk.knowledge import KnowledgeBase
+from supportdesk.llm import OpenAICompatibleClient
 from supportdesk.models import Ticket
 from supportdesk.orchestrator import SupportDeskOrchestrator
 from supportdesk.storage import TicketStore
@@ -159,7 +161,8 @@ def build_handler(
     static_dir: Path = FRONTEND_DIR,
 ) -> type[SupportDeskHandler]:
     knowledge_base = KnowledgeBase.from_json(knowledge_base_path)
-    orchestrator = SupportDeskOrchestrator(knowledge_base)
+    llm_client = OpenAICompatibleClient.from_env() if _use_llm() else None
+    orchestrator = SupportDeskOrchestrator(knowledge_base, llm_client=llm_client)
     store = TicketStore(db_path)
 
     class ConfiguredSupportDeskHandler(SupportDeskHandler):
@@ -171,6 +174,10 @@ def build_handler(
     ConfiguredSupportDeskHandler.sample_tickets_path = sample_tickets_path
     ConfiguredSupportDeskHandler.static_dir = static_dir
     return ConfiguredSupportDeskHandler
+
+
+def _use_llm() -> bool:
+    return os.environ.get("SUPPORT_DESK_USE_LLM", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def run(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from supportdesk.knowledge import KnowledgeBase
+from supportdesk.llm import LLMClient
 from supportdesk.models import AgentDecision, KnowledgeMatch, Ticket
 from supportdesk.text import keyword_score, normalize, phrase_hits, tokenize
 
@@ -24,6 +26,11 @@ NEGATIVE_SENTIMENT = ["angry", "frustrated", "upset", "disappointed", "annoyed",
 POSITIVE_SENTIMENT = ["thanks", "great", "love", "appreciate", "helpful"]
 CRITICAL_TERMS = ["security", "breach", "data loss", "production is down", "outage", "cannot access any"]
 HIGH_TERMS = ["urgent", "asap", "blocked", "charged twice", "payment failed", "cannot login", "enterprise"]
+
+
+def article_for(phrase: str) -> str:
+    first = phrase.strip().lower()[:1]
+    return "an" if first in {"a", "e", "i", "o", "u"} else "a"
 
 
 class IntakeAgent:
@@ -85,7 +92,7 @@ class IntakeAgent:
     def _confidence(self, score: float, category: str) -> float:
         if category == "general":
             return 0.35
-        return min(0.95, 0.55 + score * 0.08)
+        return round(min(0.95, 0.55 + score * 0.08), 2)
 
 
 class KnowledgeAgent:
@@ -195,6 +202,9 @@ class DiagnosticAgent:
 class ResponseAgent:
     name = "Response Agent"
 
+    def __init__(self, llm_client: LLMClient | None = None) -> None:
+        self.llm_client = llm_client
+
     def run(
         self,
         ticket: Ticket,
@@ -207,10 +217,56 @@ class ResponseAgent:
         missing = diagnostic.data.get("missing_information", [])
         matches = [self._match_from_dict(item) for item in knowledge.data.get("matches", [])]
         escalation_required = bool(diagnostic.data.get("escalation_required"))
+        draft = self._deterministic_draft(category, priority, missing, matches, escalation_required)
+        generation_mode = "deterministic"
+        llm_error = ""
 
+        if self.llm_client is not None:
+            try:
+                draft = self.llm_client.draft_reply(
+                    system_prompt=(
+                        "You are a careful support specialist. Write a concise customer-facing reply. "
+                        "Do not invent facts. Ask for missing information when needed."
+                    ),
+                    user_prompt=json.dumps(
+                        {
+                            "ticket": ticket.to_dict(),
+                            "intake": intake.to_dict(),
+                            "knowledge": knowledge.to_dict(),
+                            "diagnostic": diagnostic.to_dict(),
+                            "deterministic_fallback_draft": draft,
+                        },
+                        indent=2,
+                    ),
+                )
+                generation_mode = "openai_compatible"
+            except RuntimeError as exc:
+                llm_error = str(exc)
+
+        return AgentDecision(
+            agent=self.name,
+            summary="Drafted a grounded customer reply.",
+            confidence=0.78 if matches else 0.58,
+            data={
+                "draft": draft,
+                "uses_knowledge_base": bool(matches),
+                "cited_articles": [match.article.title for match in matches],
+                "generation_mode": generation_mode,
+                "llm_error": llm_error,
+            },
+        )
+
+    def _deterministic_draft(
+        self,
+        category: str,
+        priority: str,
+        missing: list[str],
+        matches: list[KnowledgeMatch],
+        escalation_required: bool,
+    ) -> str:
         paragraphs = [
             "Hi there,",
-            f"Thanks for reaching out. I reviewed your message and classified it as a {category} request with {priority} priority.",
+            f"Thanks for reaching out. I reviewed your message and classified it as {article_for(category)} {category} request with {priority} priority.",
         ]
 
         if matches:
@@ -238,18 +294,7 @@ class ResponseAgent:
             paragraphs.append("I will keep this with the support team unless new information changes the priority.")
 
         paragraphs.append("Regards,\nSupport Team")
-        draft = "\n\n".join(paragraphs)
-
-        return AgentDecision(
-            agent=self.name,
-            summary="Drafted a grounded customer reply.",
-            confidence=0.78 if matches else 0.58,
-            data={
-                "draft": draft,
-                "uses_knowledge_base": bool(matches),
-                "cited_articles": [match.article.title for match in matches],
-            },
-        )
+        return "\n\n".join(paragraphs)
 
     def _match_from_dict(self, item: dict[str, Any]) -> KnowledgeMatch:
         from supportdesk.models import KnowledgeArticle

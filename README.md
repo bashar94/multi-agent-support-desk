@@ -43,6 +43,63 @@ Then open:
 http://127.0.0.1:8080
 ```
 
+Run tests:
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+## API
+
+```text
+GET  /api/health
+GET  /api/sample-tickets
+GET  /api/knowledge
+GET  /api/tickets
+GET  /api/tickets/{id}
+POST /api/tickets/analyze
+POST /api/tickets/{id}/reanalyze
+```
+
+Example request:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/api/tickets/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"subject":"Cannot login","message":"Password reset is not working and our team is blocked."}'
+```
+
+## Optional LLM Drafting
+
+The default response agent is deterministic. To test an OpenAI-compatible
+provider for final draft generation:
+
+```bash
+cp .env.example .env
+export SUPPORT_DESK_USE_LLM=true
+export OPENAI_API_KEY=...
+python3 -m supportdesk.server
+```
+
+If the provider call fails, the system falls back to the deterministic draft and
+records the error in the response agent output.
+
+## Project Structure
+
+```text
+supportdesk/     Agent pipeline, API server, SQLite storage
+frontend/        Static dashboard served by the Python app
+data/            Sample tickets and knowledge base articles
+tests/           Standard-library unittest coverage
+scripts/         Local development helpers
+```
+
 ## Repository Goals
 
 This project is built to be easy to understand, demo, fork, and extend:
@@ -53,11 +110,19 @@ This project is built to be easy to understand, demo, fork, and extend:
 - useful sample data
 - clear open-source contribution path
 
+## Publishing To GitHub
+
+After creating an empty GitHub repository:
+
+```bash
+git remote add origin git@github.com:YOUR_USER/multi-agent-support-desk.git
+git push -u origin main
+```
+
 ## Roadmap
 
-- Optional OpenAI-compatible response generation
 - Gmail, Slack, Zendesk, GitHub Issues, and Discord adapters
 - RAG over Markdown and PDF knowledge bases
 - Human approval workflow
 - Team analytics and SLA reporting
-- Docker Compose deployment
+- Hosted demo deployment template

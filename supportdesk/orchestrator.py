@@ -11,15 +11,16 @@ from supportdesk.agents import (
     RoutingAgent,
 )
 from supportdesk.knowledge import KnowledgeBase
+from supportdesk.llm import LLMClient
 from supportdesk.models import Ticket, TriageResult
 
 
 class SupportDeskOrchestrator:
-    def __init__(self, knowledge_base: KnowledgeBase) -> None:
+    def __init__(self, knowledge_base: KnowledgeBase, llm_client: LLMClient | None = None) -> None:
         self.intake_agent = IntakeAgent()
         self.knowledge_agent = KnowledgeAgent(knowledge_base)
         self.diagnostic_agent = DiagnosticAgent()
-        self.response_agent = ResponseAgent()
+        self.response_agent = ResponseAgent(llm_client=llm_client)
         self.quality_agent = QualityAgent()
         self.routing_agent = RoutingAgent()
 

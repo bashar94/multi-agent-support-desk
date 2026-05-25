@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multi-Agent Support Desk</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Agentic Ticket Operations</p>
+          <h1>Multi-Agent Support Desk</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="status-pill" id="serviceStatus">Checking API</span>
+          <button class="ghost-button" id="refreshButton" type="button" title="Refresh tickets">
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="input-pane" aria-labelledby="ticketFormTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Ticket Intake</p>
+              <h2 id="ticketFormTitle">Analyze a Request</h2>
+            </div>
+            <button class="secondary-button" id="loadFirstSampleButton" type="button">
+              Load Sample
+            </button>
+          </div>
+
+          <form id="ticketForm" class="ticket-form">
+            <label>
+              <span>Subject</span>
+              <input id="subjectInput" name="subject" autocomplete="off" required />
+            </label>
+            <label>
+              <span>Customer Email</span>
+              <input id="emailInput" name="customer_email" type="email" autocomplete="off" />
+            </label>
+            <label>
+              <span>Message</span>
+              <textarea id="messageInput" name="message" rows="10" required></textarea>
+            </label>
+            <button class="primary-button" id="analyzeButton" type="submit">
+              Run Agents
+            </button>
+          </form>
+
+          <div class="split-list">
+            <div>
+              <div class="list-heading">
+                <h3>Samples</h3>
+                <span id="sampleCount">0</span>
+              </div>
+              <div class="item-list" id="sampleList"></div>
+            </div>
+            <div>
+              <div class="list-heading">
+                <h3>Recent</h3>
+                <span id="ticketCount">0</span>
+              </div>
+              <div class="item-list" id="ticketList"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="output-pane" aria-live="polite">
+          <div id="emptyState" class="empty-state">
+            <p class="eyebrow">Ready</p>
+            <h2>Run a ticket through the agent desk.</h2>
+          </div>
+
+          <div id="resultView" class="result-view hidden">
+            <div class="result-header">
+              <div>
+                <p class="eyebrow">Triage Packet</p>
+                <h2 id="resultSubject"></h2>
+              </div>
+              <button class="ghost-button" id="reanalyzeButton" type="button">
+                Reanalyze
+              </button>
+            </div>
+
+            <div class="metric-strip" id="metricStrip"></div>
+
+            <div class="agent-lane" id="agentTrace"></div>
+
+            <div class="tab-bar" role="tablist" aria-label="Result views">
+              <button class="tab-button active" type="button" data-tab="reply">Reply</button>
+              <button class="tab-button" type="button" data-tab="diagnostic">Diagnostic</button>
+              <button class="tab-button" type="button" data-tab="knowledge">Knowledge</button>
+              <button class="tab-button" type="button" data-tab="json">JSON</button>
+            </div>
+
+            <div class="tab-panel" id="replyPanel"></div>
+            <div class="tab-panel hidden" id="diagnosticPanel"></div>
+            <div class="tab-panel hidden" id="knowledgePanel"></div>
+            <pre class="tab-panel json-panel hidden" id="jsonPanel"></pre>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+[project]
+name = "multi-agent-support-desk"
+version = "0.1.0"
+description = "Dependency-light multi-agent support ticket triage system."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Multi-Agent Support Desk contributors" }]
+keywords = ["agents", "support", "triage", "automation", "sqlite"]
+dependencies = []
+
+[project.scripts]
+supportdesk = "supportdesk.server:run"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"

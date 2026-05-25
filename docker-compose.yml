@@ -1,0 +1,18 @@
+services:
+  support-desk:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SUPPORT_DESK_HOST: 0.0.0.0
+      SUPPORT_DESK_PORT: 8080
+      SUPPORT_DESK_DB: /app/.data/support_desk.sqlite3
+      SUPPORT_DESK_USE_LLM: ${SUPPORT_DESK_USE_LLM:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    volumes:
+      - support-desk-data:/app/.data
+
+volumes:
+  support-desk-data:

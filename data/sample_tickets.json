@@ -1,0 +1,32 @@
+[
+  {
+    "subject": "We were charged twice",
+    "message": "I am frustrated because our card was charged twice this morning. We need a refund and a receipt for the correct invoice.",
+    "customer_email": "finance@example.com",
+    "source": "sample"
+  },
+  {
+    "subject": "Cannot login after enabling MFA",
+    "message": "My password reset works, but I cannot sign in after enabling MFA. The whole operations team is blocked.",
+    "customer_email": "ops@example.com",
+    "source": "sample"
+  },
+  {
+    "subject": "Webhook delivery failing",
+    "message": "Our Slack integration webhook started returning 401 errors around 09:15 UTC. Request id wh_92f is failing repeatedly.",
+    "customer_email": "dev@example.com",
+    "source": "sample"
+  },
+  {
+    "subject": "Product is unavailable",
+    "message": "Production is down for our workspace and nobody can access the dashboard. This is urgent.",
+    "customer_email": "cto@example.com",
+    "source": "sample"
+  },
+  {
+    "subject": "Can you add CSV column mapping?",
+    "message": "We would like a feature that lets admins map CSV columns before import. Our current workaround is manual cleanup.",
+    "customer_email": "admin@example.com",
+    "source": "sample"
+  }
+]

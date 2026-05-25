@@ -1,0 +1,66 @@
+[
+  {
+    "id": "kb-billing-duplicate-charge",
+    "title": "Refund and duplicate charge handling",
+    "category": "billing",
+    "team": "Revenue Operations",
+    "keywords": ["billing", "invoice", "refund", "charged twice", "duplicate charge", "payment", "receipt"],
+    "content": "For duplicate charges, confirm the customer email, invoice id, charge date, amount, and receipt id. Revenue Operations should verify the payment processor record before promising a refund. If confirmed, provide the refund timeline and update the ticket with the transaction reference."
+  },
+  {
+    "id": "kb-account-access-recovery",
+    "title": "Account access recovery",
+    "category": "account_access",
+    "team": "Support Operations",
+    "keywords": ["login", "password", "locked", "mfa", "2fa", "cannot sign in", "account email"],
+    "content": "For login, password, MFA, and lockout issues, collect the account email, workspace name, last successful login time, and any visible error message. Do not disable MFA without identity verification. Escalate enterprise account lockouts when multiple users are affected."
+  },
+  {
+    "id": "kb-api-webhook-delivery",
+    "title": "Webhook delivery troubleshooting",
+    "category": "integration",
+    "team": "Integrations Engineering",
+    "keywords": ["api", "webhook", "integration", "oauth", "token", "delivery", "request id", "sync"],
+    "content": "For webhook delivery failures, ask for the integration name, timestamp, endpoint URL domain, request id, response code, and whether retries are enabled. Check recent integration incidents before asking customers to rotate credentials."
+  },
+  {
+    "id": "kb-production-incident",
+    "title": "Production incident triage",
+    "category": "outage",
+    "team": "Platform Reliability",
+    "keywords": ["outage", "down", "unavailable", "incident", "production", "service unavailable", "latency"],
+    "content": "For suspected production incidents, gather affected workspace, region, first observed time, impact scope, and screenshots or logs. Page Platform Reliability when multiple customers are affected or core workflows are unavailable."
+  },
+  {
+    "id": "kb-bug-report-template",
+    "title": "Actionable bug report requirements",
+    "category": "bug",
+    "team": "Product Engineering",
+    "keywords": ["bug", "error", "exception", "crash", "broken", "not working", "steps to reproduce"],
+    "content": "A useful bug report includes steps to reproduce, expected result, actual result, browser or app version, workspace id, and screenshots or logs. First-line support should look for a workaround before escalating to Product Engineering."
+  },
+  {
+    "id": "kb-feature-request-routing",
+    "title": "Feature request intake",
+    "category": "feature_request",
+    "team": "Product Management",
+    "keywords": ["feature", "enhancement", "roadmap", "can you add", "would like", "request"],
+    "content": "Feature requests should capture the customer's goal, affected users, current workaround, revenue or retention impact, and whether the request maps to an existing roadmap theme. Product Management reviews grouped requests weekly."
+  },
+  {
+    "id": "kb-cancellation-save",
+    "title": "Cancellation and downgrade handling",
+    "category": "cancellation",
+    "team": "Customer Success",
+    "keywords": ["cancel", "cancellation", "downgrade", "close account", "terminate", "renewal"],
+    "content": "For cancellations, confirm the account owner, renewal date, reason for leaving, and whether data export is needed. Customer Success should be notified for paid accounts before account closure."
+  },
+  {
+    "id": "kb-onboarding-import",
+    "title": "Onboarding data import support",
+    "category": "onboarding",
+    "team": "Customer Success",
+    "keywords": ["setup", "onboarding", "configure", "getting started", "import", "migration", "csv"],
+    "content": "For onboarding and import issues, collect the target outcome, current setup, data source, file format, sample row, and deadline. Offer a guided import checklist before escalating."
+  }
+]

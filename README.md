@@ -110,15 +110,6 @@ This project is built to be easy to understand, demo, fork, and extend:
 - useful sample data
 - clear open-source contribution path
 
-## Publishing To GitHub
-
-After creating an empty GitHub repository:
-
-```bash
-git remote add origin git@github.com:YOUR_USER/multi-agent-support-desk.git
-git push -u origin main
-```
-
 ## Roadmap
 
 - Gmail, Slack, Zendesk, GitHub Issues, and Discord adapters

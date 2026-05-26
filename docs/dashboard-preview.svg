@@ -1,0 +1,117 @@
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Multi-Agent Support Desk dashboard preview</title>
+  <desc id="desc">A support ticket dashboard showing ticket intake, agent trace cards, triage metrics, and a drafted customer reply.</desc>
+  <rect width="1440" height="900" fill="#f7f2e8"/>
+  <path d="M0 108H1440M550 108V900" stroke="#27231c" stroke-width="3"/>
+  <g opacity="0.35" stroke="#d2c4aa" stroke-width="1">
+    <path d="M0 0V900M34 0V900M68 0V900M102 0V900M136 0V900M170 0V900M204 0V900M238 0V900M272 0V900M306 0V900M340 0V900M374 0V900M408 0V900M442 0V900M476 0V900M510 0V900M584 0V900M618 0V900M652 0V900M686 0V900M720 0V900M754 0V900M788 0V900M822 0V900M856 0V900M890 0V900M924 0V900M958 0V900M992 0V900M1026 0V900M1060 0V900M1094 0V900M1128 0V900M1162 0V900M1196 0V900M1230 0V900M1264 0V900M1298 0V900M1332 0V900M1366 0V900M1400 0V900"/>
+    <path d="M0 142H1440M0 176H1440M0 210H1440M0 244H1440M0 278H1440M0 312H1440M0 346H1440M0 380H1440M0 414H1440M0 448H1440M0 482H1440M0 516H1440M0 550H1440M0 584H1440M0 618H1440M0 652H1440M0 686H1440M0 720H1440M0 754H1440M0 788H1440M0 822H1440M0 856H1440"/>
+  </g>
+  <text x="34" y="40" fill="#134e4a" font-family="Arial, sans-serif" font-size="13" font-weight="800" letter-spacing="1.2">AGENTIC TICKET OPERATIONS</text>
+  <text x="34" y="78" fill="#151515" font-family="Georgia, serif" font-size="38" font-weight="700">Multi-Agent Support Desk</text>
+  <rect x="1210" y="36" width="92" height="40" rx="18" fill="#fffaf0" stroke="#27231c" stroke-width="2"/>
+  <text x="1225" y="61" fill="#166534" font-family="Arial, sans-serif" font-size="13" font-weight="800">API Online</text>
+  <rect x="1315" y="36" width="90" height="40" rx="8" fill="#fffaf0" stroke="#27231c" stroke-width="2"/>
+  <text x="1334" y="61" fill="#151515" font-family="Arial, sans-serif" font-size="16" font-weight="800">Refresh</text>
+
+  <text x="34" y="151" fill="#134e4a" font-family="Arial, sans-serif" font-size="13" font-weight="800" letter-spacing="1.2">TICKET INTAKE</text>
+  <text x="34" y="185" fill="#151515" font-family="Georgia, serif" font-size="27" font-weight="700">Analyze a Request</text>
+  <rect x="383" y="146" width="132" height="40" rx="8" fill="#0f766e" stroke="#27231c" stroke-width="2"/>
+  <text x="400" y="172" fill="#fffaf0" font-family="Arial, sans-serif" font-size="16" font-weight="800">Load Sample</text>
+
+  <text x="34" y="228" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12" font-weight="800">SUBJECT</text>
+  <rect x="34" y="238" width="481" height="43" rx="7" fill="#fffaf0" stroke="#27231c" stroke-width="2"/>
+  <text x="50" y="265" fill="#151515" font-family="Arial, sans-serif" font-size="14" font-weight="700">We were charged twice</text>
+  <text x="34" y="309" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12" font-weight="800">CUSTOMER EMAIL</text>
+  <rect x="34" y="319" width="481" height="43" rx="7" fill="#fffaf0" stroke="#27231c" stroke-width="2"/>
+  <text x="50" y="346" fill="#151515" font-family="Arial, sans-serif" font-size="14" font-weight="700">finance@example.com</text>
+  <text x="34" y="390" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12" font-weight="800">MESSAGE</text>
+  <rect x="34" y="400" width="481" height="229" rx="7" fill="#fffaf0" stroke="#27231c" stroke-width="2"/>
+  <text x="50" y="429" fill="#151515" font-family="Arial, sans-serif" font-size="14" font-weight="700">I am frustrated because our card was charged twice this morning.</text>
+  <text x="50" y="449" fill="#151515" font-family="Arial, sans-serif" font-size="14" font-weight="700">We need a refund and a receipt for the correct invoice.</text>
+  <rect x="34" y="644" width="481" height="43" rx="7" fill="#151515"/>
+  <text x="229" y="671" fill="#fffaf0" font-family="Arial, sans-serif" font-size="16" font-weight="800">Run Agents</text>
+
+  <text x="34" y="730" fill="#151515" font-family="Arial, sans-serif" font-size="14" font-weight="900">SAMPLES</text>
+  <text x="283" y="730" fill="#151515" font-family="Arial, sans-serif" font-size="14" font-weight="900">RECENT</text>
+  <g fill="#fffaf0" stroke="#27231c" stroke-width="2">
+    <rect x="34" y="747" width="231" height="58" rx="7"/>
+    <rect x="283" y="747" width="231" height="58" rx="7"/>
+    <rect x="34" y="816" width="231" height="58" rx="7"/>
+    <rect x="283" y="816" width="231" height="58" rx="7"/>
+  </g>
+  <text x="48" y="773" fill="#151515" font-family="Arial, sans-serif" font-size="13" font-weight="800">We were charged twice</text>
+  <text x="48" y="792" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">finance@example.com</text>
+  <text x="297" y="773" fill="#151515" font-family="Arial, sans-serif" font-size="13" font-weight="800">We were charged twice</text>
+  <text x="297" y="792" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">High / Revenue Operations</text>
+
+  <text x="585" y="151" fill="#134e4a" font-family="Arial, sans-serif" font-size="13" font-weight="800" letter-spacing="1.2">TRIAGE PACKET</text>
+  <text x="585" y="192" fill="#151515" font-family="Georgia, serif" font-size="34" font-weight="700">We were charged twice</text>
+  <rect x="1295" y="150" width="110" height="40" rx="7" fill="#fffaf0" stroke="#27231c" stroke-width="2"/>
+  <text x="1312" y="176" fill="#151515" font-family="Arial, sans-serif" font-size="16" font-weight="800">Reanalyze</text>
+
+  <g fill="#fffaf0" stroke="#27231c" stroke-width="2">
+    <rect x="586" y="223" width="156" height="92" rx="7"/>
+    <rect x="752" y="223" width="156" height="92" rx="7"/>
+    <rect x="918" y="223" width="156" height="92" rx="7"/>
+    <rect x="1084" y="223" width="156" height="92" rx="7"/>
+    <rect x="1250" y="223" width="156" height="92" rx="7"/>
+  </g>
+  <text x="600" y="248" fill="#4c4a46" font-family="Arial, sans-serif" font-size="11" font-weight="900">PRIORITY</text>
+  <text x="600" y="276" fill="#b42318" font-family="Arial, sans-serif" font-size="18" font-weight="900">high</text>
+  <text x="766" y="248" fill="#4c4a46" font-family="Arial, sans-serif" font-size="11" font-weight="900">CATEGORY</text>
+  <text x="766" y="276" fill="#151515" font-family="Arial, sans-serif" font-size="18" font-weight="900">Billing</text>
+  <text x="932" y="248" fill="#4c4a46" font-family="Arial, sans-serif" font-size="11" font-weight="900">OWNER</text>
+  <text x="932" y="276" fill="#151515" font-family="Arial, sans-serif" font-size="18" font-weight="900">Revenue</text>
+  <text x="932" y="297" fill="#151515" font-family="Arial, sans-serif" font-size="18" font-weight="900">Operations</text>
+  <text x="1098" y="248" fill="#4c4a46" font-family="Arial, sans-serif" font-size="11" font-weight="900">SLA</text>
+  <text x="1098" y="276" fill="#151515" font-family="Arial, sans-serif" font-size="18" font-weight="900">4 business</text>
+  <text x="1098" y="297" fill="#151515" font-family="Arial, sans-serif" font-size="18" font-weight="900">hours</text>
+  <text x="1264" y="248" fill="#4c4a46" font-family="Arial, sans-serif" font-size="11" font-weight="900">QUALITY</text>
+  <text x="1264" y="276" fill="#151515" font-family="Arial, sans-serif" font-size="18" font-weight="900">100/100</text>
+
+  <g fill="#eee4d1" stroke="#27231c" stroke-width="2">
+    <rect x="586" y="340" width="128" height="107" rx="7"/>
+    <rect x="724" y="340" width="128" height="107" rx="7"/>
+    <rect x="862" y="340" width="128" height="107" rx="7"/>
+    <rect x="1000" y="340" width="128" height="107" rx="7"/>
+    <rect x="1138" y="340" width="128" height="107" rx="7"/>
+    <rect x="1276" y="340" width="128" height="107" rx="7"/>
+  </g>
+  <text x="598" y="363" fill="#151515" font-family="Arial, sans-serif" font-size="13" font-weight="900">Intake Agent</text>
+  <text x="598" y="385" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">Classified as billing</text>
+  <text x="598" y="402" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">with high priority.</text>
+  <text x="736" y="363" fill="#151515" font-family="Arial, sans-serif" font-size="13" font-weight="900">Knowledge Agent</text>
+  <text x="736" y="385" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">Found relevant</text>
+  <text x="736" y="402" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">context.</text>
+  <text x="874" y="363" fill="#151515" font-family="Arial, sans-serif" font-size="13" font-weight="900">Diagnostic Agent</text>
+  <text x="874" y="385" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">Escalation</text>
+  <text x="874" y="402" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">recommended.</text>
+  <text x="1012" y="363" fill="#151515" font-family="Arial, sans-serif" font-size="13" font-weight="900">Response Agent</text>
+  <text x="1012" y="385" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">Drafted a grounded</text>
+  <text x="1012" y="402" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">customer reply.</text>
+  <text x="1150" y="363" fill="#151515" font-family="Arial, sans-serif" font-size="13" font-weight="900">Quality Agent</text>
+  <text x="1150" y="385" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">Quality score</text>
+  <text x="1150" y="402" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">100/100.</text>
+  <text x="1288" y="363" fill="#151515" font-family="Arial, sans-serif" font-size="13" font-weight="900">Routing Agent</text>
+  <text x="1288" y="385" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">Route to Revenue</text>
+  <text x="1288" y="402" fill="#4c4a46" font-family="Arial, sans-serif" font-size="12">Operations.</text>
+
+  <rect x="586" y="471" width="74" height="42" rx="7" fill="#151515"/>
+  <text x="602" y="497" fill="#fffaf0" font-family="Arial, sans-serif" font-size="16" font-weight="800">Reply</text>
+  <g fill="#fffaf0" stroke="#27231c" stroke-width="2">
+    <rect x="673" y="471" width="111" height="42" rx="7"/>
+    <rect x="797" y="471" width="119" height="42" rx="7"/>
+    <rect x="929" y="471" width="74" height="42" rx="7"/>
+  </g>
+  <text x="690" y="497" fill="#151515" font-family="Arial, sans-serif" font-size="16" font-weight="800">Diagnostic</text>
+  <text x="814" y="497" fill="#151515" font-family="Arial, sans-serif" font-size="16" font-weight="800">Knowledge</text>
+  <text x="947" y="497" fill="#151515" font-family="Arial, sans-serif" font-size="16" font-weight="800">JSON</text>
+  <path d="M586 523H1405" stroke="#27231c" stroke-width="3"/>
+  <rect x="586" y="548" width="819" height="300" rx="7" fill="#fffaf0" stroke="#27231c" stroke-width="2"/>
+  <text x="606" y="588" fill="#151515" font-family="Georgia, serif" font-size="22">Hi there,</text>
+  <text x="606" y="645" fill="#151515" font-family="Georgia, serif" font-size="22">Thanks for reaching out. I reviewed your message and classified it as a billing request</text>
+  <text x="606" y="675" fill="#151515" font-family="Georgia, serif" font-size="22">with high priority.</text>
+  <text x="606" y="733" fill="#151515" font-family="Georgia, serif" font-size="22">The most relevant internal guidance is &quot;Refund and duplicate charge handling&quot;.</text>
+  <text x="606" y="763" fill="#151515" font-family="Georgia, serif" font-size="22">Based on that guidance, the next best step is to verify the details below.</text>
+</svg>

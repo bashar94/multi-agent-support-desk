@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+VALID_APPROVAL_STATUSES = {"pending", "approved", "changes_requested", "escalated"}
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -18,6 +20,7 @@ class Ticket:
     message: str
     customer_email: str = ""
     source: str = "manual"
+    metadata: dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=utc_now)
 
@@ -30,12 +33,17 @@ class Ticket:
         if not message:
             raise ValueError("message is required")
 
+        metadata = payload.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
         return cls(
             id=str(payload.get("id") or uuid4()),
             subject=subject,
             message=message,
             customer_email=str(payload.get("customer_email", "")).strip(),
             source=str(payload.get("source", "manual")).strip() or "manual",
+            metadata=metadata,
             created_at=str(payload.get("created_at") or utc_now()),
         )
 
@@ -82,6 +90,33 @@ class AgentDecision:
 
 
 @dataclass(frozen=True)
+class ApprovalState:
+    status: str = "pending"
+    reviewer: str = ""
+    note: str = ""
+    send_ready: bool = False
+    updated_at: str = field(default_factory=utc_now)
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> "ApprovalState":
+        status = str(payload.get("status", "pending")).strip().lower()
+        if status not in VALID_APPROVAL_STATUSES:
+            allowed = ", ".join(sorted(VALID_APPROVAL_STATUSES))
+            raise ValueError(f"approval status must be one of: {allowed}")
+
+        return cls(
+            status=status,
+            reviewer=str(payload.get("reviewer", "")).strip(),
+            note=str(payload.get("note", "")).strip(),
+            send_ready=status == "approved",
+            updated_at=str(payload.get("updated_at") or utc_now()),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class TriageResult:
     ticket: Ticket
     intake: AgentDecision
@@ -91,6 +126,7 @@ class TriageResult:
     quality: AgentDecision
     routing: AgentDecision
     trace: list[AgentDecision]
+    approval: ApprovalState = field(default_factory=ApprovalState)
     created_at: str = field(default_factory=utc_now)
 
     def to_dict(self) -> dict[str, Any]:
@@ -103,5 +139,6 @@ class TriageResult:
             "quality": self.quality.to_dict(),
             "routing": self.routing.to_dict(),
             "trace": [step.to_dict() for step in self.trace],
+            "approval": self.approval.to_dict(),
             "created_at": self.created_at,
         }

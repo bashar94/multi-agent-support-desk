@@ -1,0 +1,17 @@
+{
+  "team_id": "T123",
+  "event": {
+    "type": "message",
+    "channel": "C456",
+    "user": "U789",
+    "text": "Cannot login after enabling MFA\nMy password reset works, but I cannot sign in after enabling MFA.",
+    "ts": "1710000000.000100"
+  },
+  "authorizations": [
+    {
+      "enterprise_id": null,
+      "team_id": "T123",
+      "user_id": "U999"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "action": "opened",
+  "repository": {
+    "full_name": "example/widget-api",
+    "html_url": "https://github.com/example/widget-api"
+  },
+  "issue": {
+    "number": 42,
+    "title": "CSV import crashes with large files",
+    "body": "The CSV import crashes whenever we upload a file with more than 50k rows.",
+    "html_url": "https://github.com/example/widget-api/issues/42",
+    "state": "open",
+    "labels": [
+      { "name": "bug" },
+      { "name": "import" }
+    ],
+    "user": {
+      "login": "octo-customer",
+      "id": 12345
+    }
+  }
+}

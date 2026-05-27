@@ -1,0 +1,12 @@
+{
+  "token": "verification-token",
+  "team_id": "T123",
+  "team_domain": "example",
+  "channel_id": "C456",
+  "channel_name": "support",
+  "user_id": "U789",
+  "user_name": "alex",
+  "command": "/support",
+  "text": "Webhook delivery failing\nOur Slack integration webhook started returning 401 errors around 09:15 UTC.",
+  "trigger_id": "13345224609.738474920.8088930838d88f008e0"
+}

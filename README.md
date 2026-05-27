@@ -8,6 +8,8 @@ The first version is intentionally dependency-light: it runs with the Python
 standard library, SQLite, and a static web dashboard. It is useful without an
 LLM key, while leaving clean extension points for OpenAI-compatible providers.
 
+![Multi-Agent Support Desk dashboard preview](docs/dashboard-preview.svg)
+
 ## What It Does
 
 - Classifies support tickets by category, sentiment, severity, and urgency.

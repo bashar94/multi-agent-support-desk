@@ -22,6 +22,18 @@ Optional LLM settings:
 - `OPENAI_BASE_URL`
 - `OPENAI_MODEL`
 
+Optional production settings:
+
+- `SUPPORT_DESK_DATABASE_URL=postgresql://...` with `psycopg` installed in the image
+- `SUPPORT_DESK_OCR_COMMAND` for scanned PDF OCR extraction
+- Provider OAuth client IDs such as `GITHUB_CLIENT_ID`, `GMAIL_CLIENT_ID`, and `SLACK_CLIENT_ID`
+
+To build the Docker image with optional Postgres support:
+
+```bash
+docker build --build-arg SUPPORT_DESK_EXTRAS=postgres -t multi-agent-support-desk .
+```
+
 The app also respects the common `PORT` environment variable used by hosted
 platforms, so no custom start command is needed for providers that inject a
 runtime port.

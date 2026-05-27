@@ -22,6 +22,9 @@ LLM key, while leaving clean extension points for OpenAI-compatible providers.
 - Imports Gmail, Slack, Zendesk, GitHub Issues, and Discord payloads as tickets.
 - Tracks human approval state before a drafted reply is send-ready.
 - Shows queue analytics by priority, owner team, SLA, action, and approval state.
+- Supports OAuth installation flow records for provider adapters.
+- Supports reviewer accounts and approval audit logs.
+- Can run on SQLite by default or an optional Postgres backend.
 
 ## Agent Pipeline
 
@@ -67,11 +70,19 @@ GET  /api/health
 GET  /api/sample-tickets
 GET  /api/knowledge
 GET  /api/analytics
+GET  /api/oauth/providers
+GET  /api/oauth/installs
+GET  /api/reviewers
+GET  /api/audit-log
 GET  /api/tickets
 GET  /api/tickets/{id}
 POST /api/tickets/analyze
 POST /api/tickets/{id}/reanalyze
 POST /api/tickets/{id}/approval
+POST /api/oauth/{provider}/begin
+GET  /api/oauth/{provider}/callback
+POST /api/oauth/{provider}/callback
+POST /api/reviewers
 POST /api/integrations/gmail
 POST /api/integrations/slack
 POST /api/integrations/zendesk
@@ -98,6 +109,9 @@ curl -sS -X POST http://127.0.0.1:8080/api/tickets/TICKET_ID/approval \
 Supported approval statuses are `pending`, `approved`, `changes_requested`,
 and `escalated`.
 
+Reviewer accounts are managed through `POST /api/reviewers`. Approval changes
+write audit events, available from `GET /api/audit-log`.
+
 ## Intake Adapters
 
 Provider webhook or fixture payloads can be sent to:
@@ -112,6 +126,22 @@ POST /api/integrations/discord
 
 The adapters normalize external payloads into the same `Ticket` model used by
 the dashboard, preserving provider metadata in the stored triage packet.
+
+## OAuth Installation
+
+Provider installation flows are available for Gmail, Slack, Zendesk, GitHub, and
+Discord:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/api/oauth/github/begin \
+  -H "Content-Type: application/json" \
+  -d '{"installed_by":"lead@example.com"}'
+```
+
+The response includes an `authorization_url` and server-side install record.
+After the provider redirects back with `code` and `state`, the callback endpoint
+marks the install as connected. Set provider client IDs through environment
+variables such as `GITHUB_CLIENT_ID`, `GMAIL_CLIENT_ID`, and `SLACK_CLIENT_ID`.
 
 ## Document Knowledge Base
 
@@ -142,6 +172,14 @@ Searchable PDFs are loaded without external dependencies. For PDF metadata, add
 a sidecar JSON file with the same basename, for example `refund-guide.json` next
 to `refund-guide.pdf`.
 
+For scanned PDFs, add a same-name `.txt` OCR sidecar, or set
+`SUPPORT_DESK_OCR_COMMAND` to a command that emits text to stdout or writes to
+`{output}`. The PDF path is available as `{input}`.
+
+```bash
+export SUPPORT_DESK_OCR_COMMAND='tesseract {input} stdout'
+```
+
 ## Optional LLM Drafting
 
 The default response agent is deterministic. To test an OpenAI-compatible
@@ -156,6 +194,27 @@ python3 -m supportdesk.server
 
 If the provider call fails, the system falls back to the deterministic draft and
 records the error in the response agent output.
+
+## Database Backends
+
+SQLite is the default and needs no setup:
+
+```bash
+export SUPPORT_DESK_DB=.data/support_desk.sqlite3
+```
+
+For URL-based configuration:
+
+```bash
+export SUPPORT_DESK_DATABASE_URL=sqlite:///.data/support_desk.sqlite3
+```
+
+For Postgres, install `psycopg` in your deployment image and set:
+
+```bash
+pip install ".[postgres]"
+export SUPPORT_DESK_DATABASE_URL=postgresql://user:pass@host:5432/supportdesk
+```
 
 ## Project Structure
 
@@ -185,7 +244,7 @@ standard `PORT` environment variable used by many platforms.
 
 ## Future Ideas
 
-- OAuth installation flows for provider adapters
-- OCR support for scanned PDFs
-- Multi-user reviewer accounts and audit logs
-- Production database backend option
+- Real token exchange and refresh jobs for OAuth installs
+- OCR container image with Tesseract bundled
+- Role-based dashboard authentication
+- Managed Postgres migration scripts

@@ -12,6 +12,10 @@ from typing import Any
 from uuid import uuid4
 
 from supportdesk.models import ApprovalState, Ticket, TriageResult, utc_now
+from supportdesk.outbound import deliver_reply
+
+
+VALID_WORKFLOW_STATUSES = {"open", "reply_ready", "waiting_customer", "resolved", "closed"}
 
 
 class TicketStore:
@@ -59,6 +63,8 @@ class TicketStore:
                     approval_reviewer TEXT NOT NULL DEFAULT '',
                     approval_note TEXT NOT NULL DEFAULT '',
                     approval_updated_at TEXT NOT NULL DEFAULT '',
+                    workflow_status TEXT NOT NULL DEFAULT 'open',
+                    last_sent_at TEXT NOT NULL DEFAULT '',
                     result_json TEXT NOT NULL
                 )
                 """
@@ -122,11 +128,40 @@ class TicketStore:
                 connection,
                 "CREATE INDEX IF NOT EXISTS idx_oauth_provider ON oauth_installs(provider)",
             )
+            self._execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS reply_outbox (
+                    id TEXT PRIMARY KEY,
+                    ticket_id TEXT NOT NULL,
+                    channel TEXT NOT NULL,
+                    recipient TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    error TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    sent_at TEXT NOT NULL DEFAULT ''
+                )
+                """,
+            )
+            self._execute(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_outbox_ticket_id ON reply_outbox(ticket_id)",
+            )
+            self._execute(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_outbox_created_at ON reply_outbox(created_at DESC)",
+            )
             self._ensure_column(connection, "metadata_json", "TEXT NOT NULL DEFAULT '{}'")
             self._ensure_column(connection, "approval_status", "TEXT NOT NULL DEFAULT 'pending'")
             self._ensure_column(connection, "approval_reviewer", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(connection, "approval_note", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(connection, "approval_updated_at", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(connection, "workflow_status", "TEXT NOT NULL DEFAULT 'open'")
+            self._ensure_column(connection, "last_sent_at", "TEXT NOT NULL DEFAULT ''")
 
     def _ensure_column(self, connection: sqlite3.Connection, column: str, definition: str) -> None:
         columns = {row["name"] for row in self._execute(connection, "PRAGMA table_info(tickets)").fetchall()}
@@ -134,7 +169,7 @@ class TicketStore:
             self._execute(connection, f"ALTER TABLE tickets ADD COLUMN {column} {definition}")
 
     def save_result(self, result: TriageResult) -> dict[str, Any]:
-        payload = result.to_dict()
+        payload = self._normalize_result(result.to_dict())
         ticket = result.ticket
         approval = payload["approval"]
         with self._connection() as connection:
@@ -201,7 +236,9 @@ class TicketStore:
                     created_at,
                     updated_at,
                     approval_status,
-                    result_json
+                    result_json,
+                    workflow_status,
+                    last_sent_at
                 FROM tickets
                 ORDER BY updated_at DESC
                 LIMIT ?
@@ -221,6 +258,8 @@ class TicketStore:
                     "created_at": row["created_at"],
                     "updated_at": row["updated_at"],
                     "approval_status": row["approval_status"] or result["approval"]["status"],
+                    "workflow_status": row["workflow_status"] or result["workflow"]["status"],
+                    "last_sent_at": row["last_sent_at"] or result["workflow"]["last_sent_at"],
                     "category": result["intake"]["data"]["category"],
                     "priority": result["intake"]["data"]["priority"],
                     "owner_team": result["routing"]["data"]["owner_team"],
@@ -241,7 +280,9 @@ class TicketStore:
                     approval_status,
                     approval_reviewer,
                     approval_note,
-                    approval_updated_at
+                    approval_updated_at,
+                    workflow_status,
+                    last_sent_at
                 FROM tickets
                 WHERE id = ?
                 """,
@@ -257,6 +298,11 @@ class TicketStore:
             "note": row["approval_note"] or result["approval"]["note"],
             "updated_at": row["approval_updated_at"] or result["approval"]["updated_at"],
             "send_ready": (row["approval_status"] or result["approval"]["status"]) == "approved",
+        }
+        result["workflow"] = {
+            "status": row["workflow_status"] or result["workflow"]["status"],
+            "last_sent_at": row["last_sent_at"] or result["workflow"]["last_sent_at"],
+            "outbox": self.list_outbox(ticket_id=ticket_id, limit=5),
         }
         return result
 
@@ -344,15 +390,243 @@ class TicketStore:
             )
         return result
 
+    def send_reply(
+        self,
+        ticket_id: str,
+        channel: str = "",
+        sender: str = "",
+        dry_run: bool | None = None,
+    ) -> dict[str, Any] | None:
+        result = self.get_result(ticket_id)
+        if result is None:
+            return None
+
+        approval = result.get("approval", {})
+        if not approval.get("send_ready"):
+            raise ValueError("ticket must be approved before sending a reply")
+
+        ticket = result["ticket"]
+        response_data = result.get("response", {}).get("data", {})
+        body = str(response_data.get("draft", "")).strip()
+        if not body:
+            raise ValueError("approved reply draft is missing")
+
+        selected_channel = (channel or _channel_from_ticket(ticket)).strip().lower()
+        recipient = str(ticket.get("customer_email", "")).strip()
+        if selected_channel == "email" and not recipient:
+            raise ValueError("customer email is required for email delivery")
+
+        subject = _reply_subject(str(ticket.get("subject", "Support request")))
+        provider = _provider_from_source(str(ticket.get("source", "")), selected_channel)
+        actor_email = (sender or approval.get("reviewer") or "system").strip()
+        outbox_id = str(uuid4())
+        created_at = utc_now()
+        metadata = {
+            "approval_status": approval.get("status", ""),
+            "reviewer": approval.get("reviewer", ""),
+            "source": ticket.get("source", ""),
+        }
+
+        queued_item = {
+            "id": outbox_id,
+            "ticket_id": ticket_id,
+            "channel": selected_channel,
+            "recipient": recipient,
+            "subject": subject,
+            "body": body,
+            "status": "queued",
+            "provider": provider,
+            "error": "",
+            "metadata": metadata,
+            "created_at": created_at,
+            "sent_at": "",
+        }
+        with self._connection() as connection:
+            self._insert_outbox_in_connection(connection, queued_item)
+
+        delivery = deliver_reply(
+            channel=selected_channel,
+            recipient=recipient,
+            subject=subject,
+            body=body,
+            ticket_id=ticket_id,
+            provider=provider,
+            dry_run=dry_run,
+        )
+        sent_at = utc_now() if delivery["status"] == "sent" else ""
+        last_sent_at = sent_at or result.get("workflow", {}).get("last_sent_at", "")
+        workflow_status = _workflow_status_after_delivery(delivery["status"])
+        completed_item = {
+            **queued_item,
+            "status": delivery["status"],
+            "provider": delivery["provider"] or provider,
+            "error": delivery["error"],
+            "metadata": {**metadata, "delivery": delivery},
+            "sent_at": sent_at,
+        }
+
+        with self._connection() as connection:
+            self._execute(
+                connection,
+                """
+                UPDATE reply_outbox
+                SET status = ?, provider = ?, error = ?, metadata_json = ?, sent_at = ?
+                WHERE id = ?
+                """,
+                (
+                    completed_item["status"],
+                    completed_item["provider"],
+                    completed_item["error"],
+                    json.dumps(completed_item["metadata"]),
+                    completed_item["sent_at"],
+                    completed_item["id"],
+                ),
+            )
+            self._execute(
+                connection,
+                """
+                UPDATE tickets
+                SET workflow_status = ?, last_sent_at = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    workflow_status,
+                    last_sent_at,
+                    utc_now(),
+                    ticket_id,
+                ),
+            )
+            self._record_audit_in_connection(
+                connection,
+                ticket_id=ticket_id,
+                actor_email=actor_email,
+                action=f"reply.{completed_item['status']}",
+                before={"status": queued_item["status"]},
+                after={
+                    "status": completed_item["status"],
+                    "workflow_status": workflow_status,
+                    "provider": completed_item["provider"],
+                },
+                note=completed_item["error"],
+            )
+
+        return self.get_outbox_item(outbox_id)
+
+    def update_ticket_status(
+        self,
+        ticket_id: str,
+        status: str,
+        actor: str = "",
+        note: str = "",
+    ) -> dict[str, Any] | None:
+        normalized_status = status.strip().lower()
+        if normalized_status not in VALID_WORKFLOW_STATUSES:
+            allowed = ", ".join(sorted(VALID_WORKFLOW_STATUSES))
+            raise ValueError(f"workflow status must be one of: {allowed}")
+
+        result = self.get_result(ticket_id)
+        if result is None:
+            return None
+
+        before = dict(result.get("workflow", {}))
+        after = {
+            "status": normalized_status,
+            "last_sent_at": before.get("last_sent_at", ""),
+        }
+        with self._connection() as connection:
+            self._execute(
+                connection,
+                """
+                UPDATE tickets
+                SET workflow_status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (normalized_status, utc_now(), ticket_id),
+            )
+            self._record_audit_in_connection(
+                connection,
+                ticket_id=ticket_id,
+                actor_email=(actor or "system").strip(),
+                action=f"workflow.{normalized_status}",
+                before=before,
+                after=after,
+                note=note.strip(),
+            )
+        return self.get_result(ticket_id)
+
+    def get_outbox_item(self, outbox_id: str) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = self._execute(
+                connection,
+                """
+                SELECT
+                    id,
+                    ticket_id,
+                    channel,
+                    recipient,
+                    subject,
+                    body,
+                    status,
+                    provider,
+                    error,
+                    metadata_json,
+                    created_at,
+                    sent_at
+                FROM reply_outbox
+                WHERE id = ?
+                """,
+                (outbox_id,),
+            ).fetchone()
+        return _outbox_from_row(row) if row else None
+
+    def list_outbox(self, ticket_id: str = "", limit: int = 50) -> list[dict[str, Any]]:
+        where = ""
+        params: tuple[Any, ...]
+        if ticket_id:
+            where = "WHERE ticket_id = ?"
+            params = (ticket_id, limit)
+        else:
+            params = (limit,)
+
+        with self._connection() as connection:
+            rows = self._execute(
+                connection,
+                f"""
+                SELECT
+                    id,
+                    ticket_id,
+                    channel,
+                    recipient,
+                    subject,
+                    body,
+                    status,
+                    provider,
+                    error,
+                    metadata_json,
+                    created_at,
+                    sent_at
+                FROM reply_outbox
+                {where}
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [_outbox_from_row(row) for row in rows]
+
     def analytics(self) -> dict[str, Any]:
         with self._connection() as connection:
-            rows = self._execute(connection, "SELECT result_json, approval_status FROM tickets").fetchall()
+            rows = self._execute(
+                connection,
+                "SELECT result_json, approval_status, workflow_status FROM tickets",
+            ).fetchall()
 
         by_priority: Counter[str] = Counter()
         by_owner_team: Counter[str] = Counter()
         by_recommended_action: Counter[str] = Counter()
         by_sla: Counter[str] = Counter()
         by_approval_status: Counter[str] = Counter()
+        by_workflow_status: Counter[str] = Counter()
         quality_scores: list[int] = []
 
         for row in rows:
@@ -362,6 +636,7 @@ class TicketStore:
             by_recommended_action[str(result["routing"]["data"]["recommended_action"])] += 1
             by_sla[str(result["routing"]["data"]["sla"])] += 1
             by_approval_status[str(row["approval_status"] or result["approval"]["status"])] += 1
+            by_workflow_status[str(row["workflow_status"] or result["workflow"]["status"])] += 1
             quality_scores.append(int(result["quality"]["data"]["quality_score"]))
 
         average_quality = round(sum(quality_scores) / len(quality_scores), 1) if quality_scores else 0
@@ -374,6 +649,10 @@ class TicketStore:
             "by_approval_status": _ordered_counts(
                 by_approval_status,
                 ["pending", "approved", "changes_requested", "escalated"],
+            ),
+            "by_workflow_status": _ordered_counts(
+                by_workflow_status,
+                ["open", "reply_ready", "waiting_customer", "resolved", "closed"],
             ),
             "average_quality_score": average_quality,
         }
@@ -668,9 +947,46 @@ class TicketStore:
             ),
         )
 
+    def _insert_outbox_in_connection(self, connection: sqlite3.Connection, item: dict[str, Any]) -> None:
+        self._execute(
+            connection,
+            """
+            INSERT INTO reply_outbox (
+                id,
+                ticket_id,
+                channel,
+                recipient,
+                subject,
+                body,
+                status,
+                provider,
+                error,
+                metadata_json,
+                created_at,
+                sent_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item["id"],
+                item["ticket_id"],
+                item["channel"],
+                item["recipient"],
+                item["subject"],
+                item["body"],
+                item["status"],
+                item["provider"],
+                item["error"],
+                json.dumps(item["metadata"]),
+                item["created_at"],
+                item["sent_at"],
+            ),
+        )
+
     def _normalize_result(self, result: dict[str, Any]) -> dict[str, Any]:
         result.setdefault("approval", ApprovalState().to_dict())
         result.setdefault("ticket", {}).setdefault("metadata", {})
+        result.setdefault("workflow", {"status": "open", "last_sent_at": "", "outbox": []})
         return result
 
     def _apply_approval_to_triage(self, result: dict[str, Any], approval: dict[str, Any]) -> None:
@@ -721,6 +1037,34 @@ def _normalize_email(email: str) -> str:
     return normalized
 
 
+def _channel_from_ticket(ticket: dict[str, Any]) -> str:
+    customer = str(ticket.get("customer_email", "")).strip()
+    if "@" in customer:
+        return "email"
+    source = str(ticket.get("source", "")).split(":", 1)[0].strip().lower()
+    return source or "manual"
+
+
+def _provider_from_source(source: str, channel: str) -> str:
+    provider = source.split(":", 1)[0].strip().lower()
+    return provider or channel
+
+
+def _reply_subject(subject: str) -> str:
+    clean_subject = subject.strip() or "Support request"
+    if clean_subject.lower().startswith("re:"):
+        return clean_subject
+    return f"Re: {clean_subject}"
+
+
+def _workflow_status_after_delivery(delivery_status: str) -> str:
+    if delivery_status == "sent":
+        return "waiting_customer"
+    if delivery_status == "failed":
+        return "open"
+    return "reply_ready"
+
+
 def _reviewer_from_row(row: Any) -> dict[str, Any]:
     return {
         "email": row["email"],
@@ -748,4 +1092,21 @@ def _oauth_install_from_row(row: Any) -> dict[str, Any]:
         "metadata": json.loads(row["metadata_json"] or "{}"),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
+    }
+
+
+def _outbox_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "ticket_id": row["ticket_id"],
+        "channel": row["channel"],
+        "recipient": row["recipient"],
+        "subject": row["subject"],
+        "body": row["body"],
+        "status": row["status"],
+        "provider": row["provider"],
+        "error": row["error"],
+        "metadata": json.loads(row["metadata_json"] or "{}"),
+        "created_at": row["created_at"],
+        "sent_at": row["sent_at"],
     }

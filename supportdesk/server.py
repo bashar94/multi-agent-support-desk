@@ -91,6 +91,12 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
                 self._send_json({"events": self.store.audit_log(ticket_id=ticket_id, limit=limit)})
                 return
 
+            if path == "/api/outbox":
+                limit = int(query.get("limit", ["50"])[0])
+                ticket_id = str(query.get("ticket_id", [""])[0])
+                self._send_json({"outbox": self.store.list_outbox(ticket_id=ticket_id, limit=limit)})
+                return
+
             if path.startswith("/api/oauth/") and path.endswith("/callback"):
                 provider = path.removeprefix("/api/oauth/").removesuffix("/callback").strip("/")
                 code = str(query.get("code", [""])[0])
@@ -234,6 +240,41 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
                 self._send_json(self.store.save_result(result))
                 return
 
+            if path.startswith("/api/tickets/") and path.endswith("/send-reply"):
+                ticket_id = path.removeprefix("/api/tickets/").removesuffix("/send-reply").strip("/")
+                payload = self._read_payload()
+                try:
+                    outbox_item = self.store.send_reply(
+                        ticket_id,
+                        channel=str(payload.get("channel", "")),
+                        sender=str(payload.get("sender", "")),
+                        dry_run=_optional_bool(payload.get("dry_run")),
+                    )
+                except ValueError as exc:
+                    status = HTTPStatus.CONFLICT if "approved" in str(exc) else HTTPStatus.BAD_REQUEST
+                    self._send_json({"error": str(exc)}, status)
+                    return
+                if outbox_item is None:
+                    self._send_json({"error": "ticket not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json({"outbox": outbox_item, "ticket": self.store.get_result(ticket_id)})
+                return
+
+            if path.startswith("/api/tickets/") and path.endswith("/status"):
+                ticket_id = path.removeprefix("/api/tickets/").removesuffix("/status").strip("/")
+                payload = self._read_payload()
+                result = self.store.update_ticket_status(
+                    ticket_id,
+                    status=str(payload.get("status", "")),
+                    actor=str(payload.get("actor", "")),
+                    note=str(payload.get("note", "")),
+                )
+                if result is None:
+                    self._send_json({"error": "ticket not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json(result)
+                return
+
             if path.startswith("/api/tickets/") and path.endswith("/approval"):
                 ticket_id = path.removeprefix("/api/tickets/").removesuffix("/approval").strip("/")
                 payload = self._read_payload()
@@ -342,6 +383,19 @@ def build_handler(
 
 def _use_llm() -> bool:
     return os.environ.get("SUPPORT_DESK_USE_LLM", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError("boolean value must be true or false")
 
 
 def run(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:

@@ -36,6 +36,7 @@ class TicketStoreTest(unittest.TestCase):
             self.assertEqual(loaded["ticket"]["id"], result.ticket.id)
             self.assertEqual(tickets[0]["owner_team"], "Product Engineering")
             self.assertEqual(tickets[0]["approval_status"], "pending")
+            self.assertEqual(tickets[0]["workflow_status"], "open")
 
     def test_updates_approval_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -66,6 +67,71 @@ class TicketStoreTest(unittest.TestCase):
             self.assertEqual(reviewers[0]["email"], "lead@example.com")
             self.assertEqual(audit_events[0]["actor_email"], "lead@example.com")
             self.assertEqual(audit_events[0]["action"], "approval.approved")
+
+    def test_approved_reply_is_recorded_in_outbox(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = TicketStore(Path(temp_dir) / "desk.sqlite3")
+            orchestrator = SupportDeskOrchestrator(KnowledgeBase([]))
+            result = orchestrator.run(
+                Ticket(
+                    subject="Login issue",
+                    message="Password reset is not working.",
+                    customer_email="customer@example.com",
+                )
+            )
+            store.save_result(result)
+            store.update_approval(result.ticket.id, status="approved", reviewer="lead@example.com")
+
+            outbox_item = store.send_reply(result.ticket.id, sender="lead@example.com", dry_run=True)
+            loaded = store.get_result(result.ticket.id)
+            tickets = store.list_tickets()
+            audit_events = store.audit_log(ticket_id=result.ticket.id)
+
+            self.assertEqual(outbox_item["status"], "dry_run")
+            self.assertEqual(outbox_item["recipient"], "customer@example.com")
+            self.assertEqual(outbox_item["subject"], "Re: Login issue")
+            self.assertEqual(loaded["workflow"]["status"], "reply_ready")
+            self.assertEqual(loaded["workflow"]["outbox"][0]["id"], outbox_item["id"])
+            self.assertEqual(tickets[0]["workflow_status"], "reply_ready")
+            self.assertEqual(audit_events[0]["action"], "reply.dry_run")
+
+    def test_rejects_unapproved_reply_send(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = TicketStore(Path(temp_dir) / "desk.sqlite3")
+            orchestrator = SupportDeskOrchestrator(KnowledgeBase([]))
+            result = orchestrator.run(
+                Ticket(
+                    subject="Login issue",
+                    message="Password reset is not working.",
+                    customer_email="customer@example.com",
+                )
+            )
+            store.save_result(result)
+
+            with self.assertRaises(ValueError):
+                store.send_reply(result.ticket.id, dry_run=True)
+
+            self.assertEqual(store.list_outbox(ticket_id=result.ticket.id), [])
+
+    def test_updates_ticket_workflow_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = TicketStore(Path(temp_dir) / "desk.sqlite3")
+            orchestrator = SupportDeskOrchestrator(KnowledgeBase([]))
+            result = orchestrator.run(Ticket(subject="General question", message="Can you help me?"))
+            store.save_result(result)
+
+            updated = store.update_ticket_status(
+                result.ticket.id,
+                status="resolved",
+                actor="owner@example.com",
+                note="Customer confirmed.",
+            )
+            analytics = store.analytics()
+            audit_events = store.audit_log(ticket_id=result.ticket.id)
+
+            self.assertEqual(updated["workflow"]["status"], "resolved")
+            self.assertEqual(analytics["by_workflow_status"]["resolved"], 1)
+            self.assertEqual(audit_events[0]["action"], "workflow.resolved")
 
     def test_analytics_counts_routing_and_approval(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

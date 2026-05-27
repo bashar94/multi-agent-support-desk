@@ -29,6 +29,11 @@ const elements = {
   approvalReviewerInput: document.querySelector("#approvalReviewerInput"),
   approvalNoteInput: document.querySelector("#approvalNoteInput"),
   approvalButtons: Array.from(document.querySelectorAll("[data-approval-status]")),
+  workflowStatus: document.querySelector("#workflowStatus"),
+  workflowDetail: document.querySelector("#workflowDetail"),
+  sendReplyButton: document.querySelector("#sendReplyButton"),
+  waitingButton: document.querySelector("#waitingButton"),
+  resolveButton: document.querySelector("#resolveButton"),
   agentTrace: document.querySelector("#agentTrace"),
   replyPanel: document.querySelector("#replyPanel"),
   diagnosticPanel: document.querySelector("#diagnosticPanel"),
@@ -118,6 +123,10 @@ function bindEvents() {
     button.addEventListener("click", () => updateApproval(button.dataset.approvalStatus));
   });
 
+  elements.sendReplyButton.addEventListener("click", sendReply);
+  elements.waitingButton.addEventListener("click", () => updateWorkflowStatus("waiting_customer"));
+  elements.resolveButton.addEventListener("click", () => updateWorkflowStatus("resolved"));
+
   elements.tabs.forEach((button) => {
     button.addEventListener("click", () => setActiveTab(button.dataset.tab));
   });
@@ -172,7 +181,7 @@ function renderTickets() {
         <button class="list-item" type="button" data-ticket-id="${escapeHtml(ticket.id)}">
           <strong>${escapeHtml(ticket.subject)}</strong>
           <span>${escapeHtml(formatLabel(ticket.priority))} / ${escapeHtml(ticket.owner_team)}</span>
-          <small>${escapeHtml(formatLabel(ticket.approval_status || "pending"))}</small>
+          <small>${escapeHtml(formatLabel(ticket.approval_status || "pending"))} / ${escapeHtml(formatLabel(ticket.workflow_status || "open"))}</small>
         </button>
       `
     )
@@ -231,6 +240,7 @@ function renderResult() {
   elements.resultSubject.textContent = result.ticket.subject;
   renderMetrics(result);
   renderApproval(result);
+  renderWorkflow(result);
   renderTrace(result.trace || []);
   renderReply(result);
   renderDiagnostic(result);
@@ -250,6 +260,7 @@ function renderAnalytics() {
   const approvals = analytics.by_approval_status || {};
   const owners = analytics.by_owner_team || {};
   const actions = analytics.by_recommended_action || {};
+  const workflow = analytics.by_workflow_status || {};
   const topOwner = topCountLabel(owners);
   const topAction = topCountLabel(actions);
 
@@ -257,6 +268,7 @@ function renderAnalytics() {
     ${analyticsCard("Tickets", analytics.total_tickets || 0, `Avg quality ${analytics.average_quality_score || 0}`)}
     ${analyticsCard("Priority", countLine(priority, ["critical", "high", "medium", "low"]), "Current queue")}
     ${analyticsCard("Approval", countLine(approvals, ["pending", "approved", "changes_requested", "escalated"]), "Draft state")}
+    ${analyticsCard("Workflow", countLine(workflow, ["open", "reply_ready", "waiting_customer", "resolved", "closed"]), "Customer loop")}
     ${analyticsCard("Owner", topOwner.value, topOwner.label)}
     ${analyticsCard("Action", topAction.value, topAction.label)}
   `;
@@ -329,6 +341,22 @@ function renderApproval(result) {
   elements.approvalNoteInput.value = approval.note || "";
 }
 
+function renderWorkflow(result) {
+  const workflow = result.workflow || {};
+  const approval = result.approval || {};
+  const workflowStatus = workflow.status || "open";
+  const latestOutbox = Array.isArray(workflow.outbox) ? workflow.outbox[0] : null;
+
+  elements.workflowStatus.textContent = formatLabel(workflowStatus);
+  elements.workflowStatus.className = `workflow-${workflowStatus}`;
+  elements.workflowDetail.textContent = workflowDetail(workflow, latestOutbox);
+
+  const approved = approval.status === "approved";
+  elements.sendReplyButton.disabled = !approved;
+  elements.waitingButton.disabled = workflowStatus === "waiting_customer";
+  elements.resolveButton.disabled = workflowStatus === "resolved";
+}
+
 async function updateApproval(status) {
   if (!state.result) {
     return;
@@ -354,6 +382,66 @@ async function updateApproval(status) {
       button.disabled = false;
     });
   }
+}
+
+async function sendReply() {
+  if (!state.result) {
+    return;
+  }
+
+  setWorkflowButtonsDisabled(true);
+  try {
+    const response = await api(`/api/tickets/${state.result.ticket.id}/send-reply`, {
+      method: "POST",
+      body: JSON.stringify({
+        sender: elements.approvalReviewerInput.value,
+      }),
+    });
+    setResult(response.ticket);
+    await Promise.all([loadTickets(), loadAnalytics()]);
+  } finally {
+    setWorkflowButtonsDisabled(false);
+    renderWorkflow(state.result);
+  }
+}
+
+async function updateWorkflowStatus(status) {
+  if (!state.result) {
+    return;
+  }
+
+  setWorkflowButtonsDisabled(true);
+  try {
+    const result = await api(`/api/tickets/${state.result.ticket.id}/status`, {
+      method: "POST",
+      body: JSON.stringify({
+        status,
+        actor: elements.approvalReviewerInput.value,
+        note: elements.approvalNoteInput.value,
+      }),
+    });
+    setResult(result);
+    await Promise.all([loadTickets(), loadAnalytics()]);
+  } finally {
+    setWorkflowButtonsDisabled(false);
+    renderWorkflow(state.result);
+  }
+}
+
+function setWorkflowButtonsDisabled(disabled) {
+  [elements.sendReplyButton, elements.waitingButton, elements.resolveButton].forEach((button) => {
+    button.disabled = disabled;
+  });
+}
+
+function workflowDetail(workflow, latestOutbox) {
+  if (latestOutbox) {
+    return `${formatLabel(latestOutbox.status)} via ${formatLabel(latestOutbox.channel)}`;
+  }
+  if (workflow.last_sent_at) {
+    return `Last sent ${new Date(workflow.last_sent_at).toLocaleString()}`;
+  }
+  return "No reply sent";
 }
 
 function renderReply(result) {

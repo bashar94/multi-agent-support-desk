@@ -21,7 +21,9 @@ LLM key, while leaving clean extension points for OpenAI-compatible providers.
 - Stores tickets and agent traces in SQLite for demos and audits.
 - Imports Gmail, Slack, Zendesk, GitHub Issues, and Discord payloads as tickets.
 - Tracks human approval state before a drafted reply is send-ready.
-- Shows queue analytics by priority, owner team, SLA, action, and approval state.
+- Sends approved replies through a safe outbox, SMTP, or a generic outbound webhook.
+- Tracks ticket workflow status from open to reply-ready, waiting, resolved, or closed.
+- Shows queue analytics by priority, owner team, SLA, action, approval, and workflow state.
 - Supports OAuth installation flow records for provider adapters.
 - Supports reviewer accounts and approval audit logs.
 - Can run on SQLite by default or an optional Postgres backend.
@@ -74,11 +76,14 @@ GET  /api/oauth/providers
 GET  /api/oauth/installs
 GET  /api/reviewers
 GET  /api/audit-log
+GET  /api/outbox
 GET  /api/tickets
 GET  /api/tickets/{id}
 POST /api/tickets/analyze
 POST /api/tickets/{id}/reanalyze
 POST /api/tickets/{id}/approval
+POST /api/tickets/{id}/send-reply
+POST /api/tickets/{id}/status
 POST /api/oauth/{provider}/begin
 GET  /api/oauth/{provider}/callback
 POST /api/oauth/{provider}/callback
@@ -111,6 +116,59 @@ and `escalated`.
 
 Reviewer accounts are managed through `POST /api/reviewers`. Approval changes
 write audit events, available from `GET /api/audit-log`.
+
+## Solo Developer Workflow
+
+The intended daily loop is:
+
+1. Send tickets from the dashboard or an adapter endpoint.
+2. Let the agents classify, search knowledge, diagnose, draft, check, and route.
+3. Approve, request edits, or escalate the generated reply.
+4. Send the approved reply. By default it is recorded in the outbox as a dry run.
+5. Mark the ticket as waiting for the customer, resolved, or closed.
+
+Send an approved reply:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/api/tickets/TICKET_ID/send-reply \
+  -H "Content-Type: application/json" \
+  -d '{"sender":"lead@example.com"}'
+```
+
+Update workflow status:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/api/tickets/TICKET_ID/status \
+  -H "Content-Type: application/json" \
+  -d '{"status":"resolved","actor":"lead@example.com","note":"Customer confirmed."}'
+```
+
+Supported workflow statuses are `open`, `reply_ready`, `waiting_customer`,
+`resolved`, and `closed`.
+
+## Reply Delivery
+
+The default reply mode is safe for local development and open-source demos:
+
+```bash
+export SUPPORT_DESK_REPLY_MODE=dry_run
+```
+
+Dry-run replies are stored in the outbox and visible from the ticket response or
+`GET /api/outbox`. To send email, set `SUPPORT_DESK_REPLY_MODE=send` and SMTP
+settings:
+
+```bash
+export SUPPORT_DESK_REPLY_MODE=send
+export SMTP_HOST=smtp.example.com
+export SMTP_PORT=587
+export SMTP_USERNAME=apikey
+export SMTP_PASSWORD=...
+export SMTP_FROM=support@example.com
+```
+
+For non-email workflows, set `SUPPORT_DESK_OUTBOUND_WEBHOOK_URL` to post the
+approved reply payload to a tool such as n8n, Make, Zapier, or a custom worker.
 
 ## Intake Adapters
 
@@ -236,15 +294,3 @@ This project is built to be easy to understand, demo, fork, and extend:
 - testable business logic
 - useful sample data
 - clear open-source contribution path
-
-## Hosted Demo
-
-Use `deploy/render.yaml` as a hosted demo template. The app also respects the
-standard `PORT` environment variable used by many platforms.
-
-## Future Ideas
-
-- Real token exchange and refresh jobs for OAuth installs
-- OCR container image with Tesseract bundled
-- Role-based dashboard authentication
-- Managed Postgres migration scripts

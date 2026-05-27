@@ -51,6 +51,47 @@ Confirm invoice evidence before promising a refund.
             self.assertEqual(article.category, "general")
             self.assertEqual(article.team, "Support Operations")
 
+    def test_document_directory_loads_searchable_pdf_with_sidecar_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            (base / "refund-guide.pdf").write_bytes(
+                b"""%PDF-1.4
+1 0 obj
+<< /Length 120 >>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(Refund PDF Playbook) Tj
+0 -16 Td
+(Confirm duplicate charge invoice evidence before promising a refund.) Tj
+ET
+endstream
+endobj
+%%EOF
+"""
+            )
+            (base / "refund-guide.json").write_text(
+                """{
+  "id": "kb-pdf-refunds",
+  "title": "Refund PDF Playbook",
+  "category": "billing",
+  "team": "Revenue Operations",
+  "keywords": ["refund", "duplicate charge", "invoice"]
+}
+""",
+                encoding="utf-8",
+            )
+
+            knowledge_base = KnowledgeBase.from_path(base)
+            article = knowledge_base.articles[0]
+            matches = knowledge_base.search("duplicate charge refund", category="billing")
+
+            self.assertEqual(article.id, "kb-pdf-refunds")
+            self.assertEqual(article.title, "Refund PDF Playbook")
+            self.assertIn("duplicate charge invoice evidence", article.content)
+            self.assertEqual(matches[0].article.id, "kb-pdf-refunds")
+
 
 if __name__ == "__main__":
     unittest.main()

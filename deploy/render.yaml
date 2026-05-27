@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: multi-agent-support-desk
+    runtime: docker
+    autoDeploy: true
+    healthCheckPath: /api/health
+    disk:
+      name: support-desk-data
+      mountPath: /app/.data
+      sizeGB: 1
+    envVars:
+      - key: SUPPORT_DESK_HOST
+        value: 0.0.0.0
+      - key: SUPPORT_DESK_DB
+        value: /app/.data/support_desk.sqlite3
+      - key: SUPPORT_DESK_USE_LLM
+        value: "false"
+      - key: SUPPORT_DESK_KNOWLEDGE_PATH
+        value: data/knowledge_base.json
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://api.openai.com/v1
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini

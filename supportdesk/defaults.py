@@ -12,4 +12,4 @@ DEFAULT_KNOWLEDGE_BASE = DATA_DIR / "knowledge_base.json"
 DEFAULT_SAMPLE_TICKETS = DATA_DIR / "sample_tickets.json"
 DEFAULT_DB_PATH = PROJECT_ROOT / os.environ.get("SUPPORT_DESK_DB", ".data/support_desk.sqlite3")
 DEFAULT_HOST = os.environ.get("SUPPORT_DESK_HOST", "127.0.0.1")
-DEFAULT_PORT = int(os.environ.get("SUPPORT_DESK_PORT", "8080"))
+DEFAULT_PORT = int(os.environ.get("SUPPORT_DESK_PORT", os.environ.get("PORT", "8080")))

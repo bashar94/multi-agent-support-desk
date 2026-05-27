@@ -19,7 +19,7 @@ LLM key, while leaving clean extension points for OpenAI-compatible providers.
 - Reviews the draft for tone, completeness, and hallucination risk.
 - Routes the ticket to an owner team with tags and SLA guidance.
 - Stores tickets and agent traces in SQLite for demos and audits.
-- Imports Slack messages, Slack slash commands, and GitHub Issues as tickets.
+- Imports Gmail, Slack, Zendesk, GitHub Issues, and Discord payloads as tickets.
 - Tracks human approval state before a drafted reply is send-ready.
 - Shows queue analytics by priority, owner team, SLA, action, and approval state.
 
@@ -72,8 +72,11 @@ GET  /api/tickets/{id}
 POST /api/tickets/analyze
 POST /api/tickets/{id}/reanalyze
 POST /api/tickets/{id}/approval
+POST /api/integrations/gmail
 POST /api/integrations/slack
+POST /api/integrations/zendesk
 POST /api/integrations/github-issues
+POST /api/integrations/discord
 ```
 
 Example request:
@@ -97,25 +100,23 @@ and `escalated`.
 
 ## Intake Adapters
 
-Slack message events and Slack slash command payloads can be sent to:
+Provider webhook or fixture payloads can be sent to:
 
 ```text
+POST /api/integrations/gmail
 POST /api/integrations/slack
-```
-
-GitHub issue webhook payloads can be sent to:
-
-```text
+POST /api/integrations/zendesk
 POST /api/integrations/github-issues
+POST /api/integrations/discord
 ```
 
 The adapters normalize external payloads into the same `Ticket` model used by
 the dashboard, preserving provider metadata in the stored triage packet.
 
-## Markdown Knowledge Base
+## Document Knowledge Base
 
-The default knowledge base is JSON. To load a directory of Markdown articles,
-point `SUPPORT_DESK_KNOWLEDGE_PATH` at a folder:
+The default knowledge base is JSON. To load a directory of Markdown and
+searchable PDF articles, point `SUPPORT_DESK_KNOWLEDGE_PATH` at a folder:
 
 ```bash
 export SUPPORT_DESK_KNOWLEDGE_PATH=./knowledge
@@ -136,6 +137,10 @@ keywords: [refund, duplicate charge, invoice]
 
 Confirm invoice evidence before promising a refund.
 ```
+
+Searchable PDFs are loaded without external dependencies. For PDF metadata, add
+a sidecar JSON file with the same basename, for example `refund-guide.json` next
+to `refund-guide.pdf`.
 
 ## Optional LLM Drafting
 
@@ -160,6 +165,7 @@ frontend/        Static dashboard served by the Python app
 data/            Sample tickets and knowledge base articles
 tests/           Standard-library unittest coverage
 scripts/         Local development helpers
+deploy/          Docker hosting template and deployment notes
 ```
 
 ## Repository Goals
@@ -172,8 +178,14 @@ This project is built to be easy to understand, demo, fork, and extend:
 - useful sample data
 - clear open-source contribution path
 
-## Roadmap
+## Hosted Demo
 
-- Gmail, Zendesk, and Discord adapters
-- PDF knowledge base loading
-- Hosted demo deployment template
+Use `deploy/render.yaml` as a hosted demo template. The app also respects the
+standard `PORT` environment variable used by many platforms.
+
+## Future Ideas
+
+- OAuth installation flows for provider adapters
+- OCR support for scanned PDFs
+- Multi-user reviewer accounts and audit logs
+- Production database backend option

@@ -1,0 +1,17 @@
+{
+  "ticket": {
+    "id": 9812,
+    "subject": "Refund needed for duplicate charge",
+    "description": "The customer was charged twice and needs an invoice correction.",
+    "priority": "high",
+    "status": "open",
+    "tags": ["billing", "refund"],
+    "requester": {
+      "name": "Finance Lead",
+      "email": "finance@example.com"
+    },
+    "via": {
+      "channel": "web"
+    }
+  }
+}

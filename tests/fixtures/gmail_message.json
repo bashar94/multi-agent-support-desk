@@ -1,0 +1,16 @@
+{
+  "id": "18f8d7c0a123",
+  "threadId": "18f8d7c0a123",
+  "labelIds": ["INBOX", "IMPORTANT"],
+  "snippet": "My password reset is not working.",
+  "payload": {
+    "mimeType": "text/plain",
+    "headers": [
+      { "name": "From", "value": "Ops Lead <ops@example.com>" },
+      { "name": "Subject", "value": "Cannot login after enabling MFA" }
+    ],
+    "body": {
+      "data": "TXkgcGFzc3dvcmQgcmVzZXQgaXMgbm90IHdvcmtpbmcu"
+    }
+  }
+}

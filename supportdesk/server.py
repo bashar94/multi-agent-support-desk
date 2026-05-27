@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from supportdesk.adapters import ticket_from_github_issue_payload, ticket_from_slack_payload
+from supportdesk.adapters import (
+    ticket_from_discord_payload,
+    ticket_from_github_issue_payload,
+    ticket_from_gmail_payload,
+    ticket_from_slack_payload,
+    ticket_from_zendesk_payload,
+)
 from supportdesk.defaults import (
     DEFAULT_DB_PATH,
     DEFAULT_HOST,
@@ -104,6 +110,27 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
             if path == "/api/integrations/github-issues":
                 payload = self._read_payload()
                 ticket = ticket_from_github_issue_payload(payload)
+                result = self.orchestrator.run(ticket)
+                self._send_json(self.store.save_result(result), HTTPStatus.CREATED)
+                return
+
+            if path == "/api/integrations/gmail":
+                payload = self._read_payload()
+                ticket = ticket_from_gmail_payload(payload)
+                result = self.orchestrator.run(ticket)
+                self._send_json(self.store.save_result(result), HTTPStatus.CREATED)
+                return
+
+            if path == "/api/integrations/zendesk":
+                payload = self._read_payload()
+                ticket = ticket_from_zendesk_payload(payload)
+                result = self.orchestrator.run(ticket)
+                self._send_json(self.store.save_result(result), HTTPStatus.CREATED)
+                return
+
+            if path == "/api/integrations/discord":
+                payload = self._read_payload()
+                ticket = ticket_from_discord_payload(payload)
                 result = self.orchestrator.run(ticket)
                 self._send_json(self.store.save_result(result), HTTPStatus.CREATED)
                 return

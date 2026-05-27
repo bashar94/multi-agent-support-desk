@@ -250,6 +250,41 @@ textarea:focus {
   gap: 9px;
 }
 
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 20px;
+}
+
+.analytics-card {
+  min-height: 86px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffaf0;
+  padding: 10px;
+}
+
+.analytics-card span,
+.analytics-card small {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.analytics-card span {
+  text-transform: uppercase;
+}
+
+.analytics-card strong {
+  display: block;
+  margin: 7px 0 5px;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
 .list-item {
   width: 100%;
   border: 2px solid var(--line);
@@ -275,6 +310,15 @@ textarea:focus {
 .list-item span {
   color: var(--ink-soft);
   font-size: 12px;
+}
+
+.list-item small {
+  display: block;
+  margin-top: 6px;
+  color: var(--teal-dark);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
 .empty-state {
@@ -346,6 +390,48 @@ textarea:focus {
 
 .metric.priority-low strong {
   color: var(--green);
+}
+
+.approval-panel {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(140px, 1fr) minmax(180px, 1.2fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffaf0;
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+
+.approval-panel span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.approval-status {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+}
+
+.approval-approved {
+  color: var(--green);
+}
+
+.approval-changes_requested,
+.approval-escalated {
+  color: var(--red);
+}
+
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .agent-lane {
@@ -479,8 +565,13 @@ textarea:focus {
   }
 
   .metric-strip,
-  .agent-lane {
+  .agent-lane,
+  .analytics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .approval-panel {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -509,6 +600,7 @@ textarea:focus {
 
   .metric-strip,
   .agent-lane,
+  .analytics-grid,
   .detail-grid {
     grid-template-columns: 1fr;
   }

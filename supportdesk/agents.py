@@ -324,6 +324,7 @@ class QualityAgent:
         failed = [name for name, passed in checks.items() if not passed]
         quality_score = max(0, 100 - len(failed) * 18)
         hallucination_risk = "low" if checks["grounded_or_cautious"] else "medium"
+        quality_gate_passed = quality_score >= 82 and hallucination_risk != "high"
 
         return AgentDecision(
             agent=self.name,
@@ -334,7 +335,9 @@ class QualityAgent:
                 "failed_checks": failed,
                 "checks": checks,
                 "hallucination_risk": hallucination_risk,
-                "approved_for_send": quality_score >= 82 and hallucination_risk != "high",
+                "quality_gate_passed": quality_gate_passed,
+                "requires_human_approval": True,
+                "approved_for_send": False,
             },
         )
 
@@ -373,8 +376,10 @@ class RoutingAgent:
             tags.append("customer-friction")
         if diagnostic.data.get("missing_information"):
             tags.append("needs-more-info")
-        if quality.data.get("approved_for_send"):
-            tags.append("draft-approved")
+        if quality.data.get("quality_gate_passed"):
+            tags.append("quality-ready")
+
+        recommended_action = "human_review" if diagnostic.data.get("escalation_required") else "approval_required"
 
         return AgentDecision(
             agent=self.name,
@@ -384,6 +389,6 @@ class RoutingAgent:
                 "owner_team": owner_team,
                 "sla": self.SLA_BY_PRIORITY[priority],
                 "tags": sorted(set(tags)),
-                "recommended_action": "human_review" if diagnostic.data.get("escalation_required") else "send_draft",
+                "recommended_action": recommended_action,
             },
         )

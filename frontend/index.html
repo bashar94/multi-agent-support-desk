@@ -51,6 +51,8 @@
             </button>
           </form>
 
+          <div class="analytics-grid" id="analyticsGrid"></div>
+
           <div class="split-list">
             <div>
               <div class="list-heading">
@@ -87,6 +89,22 @@
             </div>
 
             <div class="metric-strip" id="metricStrip"></div>
+
+            <div class="approval-panel">
+              <div>
+                <span>Approval</span>
+                <strong id="approvalStatus">Pending</strong>
+              </div>
+              <input id="approvalReviewerInput" autocomplete="off" placeholder="Reviewer" />
+              <input id="approvalNoteInput" autocomplete="off" placeholder="Note" />
+              <div class="approval-actions">
+                <button class="ghost-button" type="button" data-approval-status="approved">Approve</button>
+                <button class="ghost-button" type="button" data-approval-status="changes_requested">
+                  Request Edits
+                </button>
+                <button class="ghost-button" type="button" data-approval-status="escalated">Escalate</button>
+              </div>
+            </div>
 
             <div class="agent-lane" id="agentTrace"></div>
 

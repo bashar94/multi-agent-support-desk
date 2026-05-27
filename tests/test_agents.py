@@ -42,6 +42,8 @@ class AgentPipelineTest(unittest.TestCase):
         self.assertEqual(result.routing.data["owner_team"], "Revenue Operations")
         self.assertIn("needs-human-review", result.routing.data["tags"])
         self.assertTrue(result.knowledge.data["matches"])
+        self.assertTrue(result.quality.data["quality_gate_passed"])
+        self.assertFalse(result.quality.data["approved_for_send"])
 
     def test_account_access_ticket_requests_missing_context(self) -> None:
         ticket = Ticket(

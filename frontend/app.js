@@ -1,6 +1,7 @@
 const state = {
   samples: [],
   tickets: [],
+  analytics: null,
   result: null,
   activeTab: "reply",
 };
@@ -18,11 +19,16 @@ const elements = {
   sampleList: document.querySelector("#sampleList"),
   ticketCount: document.querySelector("#ticketCount"),
   ticketList: document.querySelector("#ticketList"),
+  analyticsGrid: document.querySelector("#analyticsGrid"),
   emptyState: document.querySelector("#emptyState"),
   resultView: document.querySelector("#resultView"),
   resultSubject: document.querySelector("#resultSubject"),
   reanalyzeButton: document.querySelector("#reanalyzeButton"),
   metricStrip: document.querySelector("#metricStrip"),
+  approvalStatus: document.querySelector("#approvalStatus"),
+  approvalReviewerInput: document.querySelector("#approvalReviewerInput"),
+  approvalNoteInput: document.querySelector("#approvalNoteInput"),
+  approvalButtons: Array.from(document.querySelectorAll("[data-approval-status]")),
   agentTrace: document.querySelector("#agentTrace"),
   replyPanel: document.querySelector("#replyPanel"),
   diagnosticPanel: document.querySelector("#diagnosticPanel"),
@@ -72,7 +78,7 @@ async function initialize() {
     setStatus("API Offline", "fail");
   }
 
-  await Promise.all([loadSamples(), loadTickets()]);
+  await Promise.all([loadSamples(), loadTickets(), loadAnalytics()]);
   if (state.samples[0]) {
     fillForm(state.samples[0]);
   }
@@ -84,7 +90,9 @@ function bindEvents() {
     await analyzeCurrentTicket();
   });
 
-  elements.refreshButton.addEventListener("click", loadTickets);
+  elements.refreshButton.addEventListener("click", async () => {
+    await Promise.all([loadTickets(), loadAnalytics()]);
+  });
 
   elements.loadFirstSampleButton.addEventListener("click", () => {
     if (state.samples[0]) {
@@ -100,10 +108,14 @@ function bindEvents() {
     try {
       const result = await api(`/api/tickets/${state.result.ticket.id}/reanalyze`, { method: "POST" });
       setResult(result);
-      await loadTickets();
+      await Promise.all([loadTickets(), loadAnalytics()]);
     } finally {
       elements.reanalyzeButton.disabled = false;
     }
+  });
+
+  elements.approvalButtons.forEach((button) => {
+    button.addEventListener("click", () => updateApproval(button.dataset.approvalStatus));
   });
 
   elements.tabs.forEach((button) => {
@@ -121,6 +133,12 @@ async function loadTickets() {
   const data = await api("/api/tickets");
   state.tickets = data.tickets || [];
   renderTickets();
+}
+
+async function loadAnalytics() {
+  const data = await api("/api/analytics");
+  state.analytics = data.analytics || null;
+  renderAnalytics();
 }
 
 function renderSamples() {
@@ -154,6 +172,7 @@ function renderTickets() {
         <button class="list-item" type="button" data-ticket-id="${escapeHtml(ticket.id)}">
           <strong>${escapeHtml(ticket.subject)}</strong>
           <span>${escapeHtml(formatLabel(ticket.priority))} / ${escapeHtml(ticket.owner_team)}</span>
+          <small>${escapeHtml(formatLabel(ticket.approval_status || "pending"))}</small>
         </button>
       `
     )
@@ -189,7 +208,7 @@ async function analyzeCurrentTicket() {
       body: JSON.stringify(payload),
     });
     setResult(result);
-    await loadTickets();
+    await Promise.all([loadTickets(), loadAnalytics()]);
   } finally {
     elements.analyzeButton.disabled = false;
     elements.analyzeButton.textContent = "Run Agents";
@@ -211,12 +230,61 @@ function renderResult() {
 
   elements.resultSubject.textContent = result.ticket.subject;
   renderMetrics(result);
+  renderApproval(result);
   renderTrace(result.trace || []);
   renderReply(result);
   renderDiagnostic(result);
   renderKnowledge(result);
   elements.jsonPanel.textContent = JSON.stringify(result, null, 2);
   setActiveTab(state.activeTab);
+}
+
+function renderAnalytics() {
+  const analytics = state.analytics;
+  if (!analytics) {
+    elements.analyticsGrid.innerHTML = "";
+    return;
+  }
+
+  const priority = analytics.by_priority || {};
+  const approvals = analytics.by_approval_status || {};
+  const owners = analytics.by_owner_team || {};
+  const actions = analytics.by_recommended_action || {};
+  const topOwner = topCountLabel(owners);
+  const topAction = topCountLabel(actions);
+
+  elements.analyticsGrid.innerHTML = `
+    ${analyticsCard("Tickets", analytics.total_tickets || 0, `Avg quality ${analytics.average_quality_score || 0}`)}
+    ${analyticsCard("Priority", countLine(priority, ["critical", "high", "medium", "low"]), "Current queue")}
+    ${analyticsCard("Approval", countLine(approvals, ["pending", "approved", "changes_requested", "escalated"]), "Draft state")}
+    ${analyticsCard("Owner", topOwner.value, topOwner.label)}
+    ${analyticsCard("Action", topAction.value, topAction.label)}
+  `;
+}
+
+function analyticsCard(label, value, detail) {
+  return `
+    <section class="analytics-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail || "")}</small>
+    </section>
+  `;
+}
+
+function countLine(counts, keys) {
+  return keys
+    .filter((key) => Number(counts[key] || 0) > 0)
+    .map((key) => `${formatLabel(key)} ${counts[key]}`)
+    .join(" / ") || "None";
+}
+
+function topCountLabel(counts) {
+  const entries = Object.entries(counts || {}).sort((a, b) => Number(b[1]) - Number(a[1]));
+  if (!entries.length) {
+    return { value: "None", label: "No tickets" };
+  }
+  return { value: entries[0][0], label: `${entries[0][1]} ticket${entries[0][1] === 1 ? "" : "s"}` };
 }
 
 function renderMetrics(result) {
@@ -251,6 +319,41 @@ function renderTrace(trace) {
       `
     )
     .join("");
+}
+
+function renderApproval(result) {
+  const approval = result.approval || {};
+  elements.approvalStatus.textContent = formatLabel(approval.status || "pending");
+  elements.approvalStatus.className = `approval-status approval-${approval.status || "pending"}`;
+  elements.approvalReviewerInput.value = approval.reviewer || "";
+  elements.approvalNoteInput.value = approval.note || "";
+}
+
+async function updateApproval(status) {
+  if (!state.result) {
+    return;
+  }
+
+  elements.approvalButtons.forEach((button) => {
+    button.disabled = true;
+  });
+
+  try {
+    const result = await api(`/api/tickets/${state.result.ticket.id}/approval`, {
+      method: "POST",
+      body: JSON.stringify({
+        status,
+        reviewer: elements.approvalReviewerInput.value,
+        note: elements.approvalNoteInput.value,
+      }),
+    });
+    setResult(result);
+    await Promise.all([loadTickets(), loadAnalytics()]);
+  } finally {
+    elements.approvalButtons.forEach((button) => {
+      button.disabled = false;
+    });
+  }
 }
 
 function renderReply(result) {

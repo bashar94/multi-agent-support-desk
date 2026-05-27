@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from supportdesk.adapters import ticket_from_github_issue_payload, ticket_from_slack_payload
 from supportdesk.defaults import (
     DEFAULT_DB_PATH,
     DEFAULT_HOST,
@@ -61,6 +62,10 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
                 self._send_json({"tickets": self.store.list_tickets(limit=limit)})
                 return
 
+            if path == "/api/analytics":
+                self._send_json({"analytics": self.store.analytics()})
+                return
+
             if path.startswith("/api/tickets/"):
                 ticket_id = path.removeprefix("/api/tickets/").strip("/")
                 result = self.store.get_result(ticket_id)
@@ -80,8 +85,25 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
             path = parsed.path
 
             if path == "/api/tickets/analyze":
-                payload = self._read_json()
+                payload = self._read_payload()
                 ticket = Ticket.from_payload(payload)
+                result = self.orchestrator.run(ticket)
+                self._send_json(self.store.save_result(result), HTTPStatus.CREATED)
+                return
+
+            if path == "/api/integrations/slack":
+                payload = self._read_payload()
+                if payload.get("type") == "url_verification":
+                    self._send_json({"challenge": payload.get("challenge", "")})
+                    return
+                ticket = ticket_from_slack_payload(payload)
+                result = self.orchestrator.run(ticket)
+                self._send_json(self.store.save_result(result), HTTPStatus.CREATED)
+                return
+
+            if path == "/api/integrations/github-issues":
+                payload = self._read_payload()
+                ticket = ticket_from_github_issue_payload(payload)
                 result = self.orchestrator.run(ticket)
                 self._send_json(self.store.save_result(result), HTTPStatus.CREATED)
                 return
@@ -96,6 +118,21 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
                 self._send_json(self.store.save_result(result))
                 return
 
+            if path.startswith("/api/tickets/") and path.endswith("/approval"):
+                ticket_id = path.removeprefix("/api/tickets/").removesuffix("/approval").strip("/")
+                payload = self._read_payload()
+                result = self.store.update_approval(
+                    ticket_id,
+                    status=str(payload.get("status", "")),
+                    reviewer=str(payload.get("reviewer", "")),
+                    note=str(payload.get("note", "")),
+                )
+                if result is None:
+                    self._send_json({"error": "ticket not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json(result)
+                return
+
             self._send_json({"error": "route not found"}, HTTPStatus.NOT_FOUND)
         except ValueError as exc:
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
@@ -106,11 +143,15 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
         with self.sample_tickets_path.open("r", encoding="utf-8") as handle:
             return json.load(handle)
 
-    def _read_json(self) -> dict[str, Any]:
+    def _read_payload(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         if length == 0:
             return {}
         raw = self.rfile.read(length).decode("utf-8")
+        content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        if content_type == "application/x-www-form-urlencoded":
+            parsed = parse_qs(raw, keep_blank_values=True)
+            return {key: values[-1] if len(values) == 1 else values for key, values in parsed.items()}
         return json.loads(raw)
 
     def _serve_static(self, path: str) -> None:
@@ -160,7 +201,8 @@ def build_handler(
     db_path: Path = DEFAULT_DB_PATH,
     static_dir: Path = FRONTEND_DIR,
 ) -> type[SupportDeskHandler]:
-    knowledge_base = KnowledgeBase.from_json(knowledge_base_path)
+    configured_knowledge_path = Path(os.environ.get("SUPPORT_DESK_KNOWLEDGE_PATH", str(knowledge_base_path)))
+    knowledge_base = KnowledgeBase.from_path(configured_knowledge_path)
     llm_client = OpenAICompatibleClient.from_env() if _use_llm() else None
     orchestrator = SupportDeskOrchestrator(knowledge_base, llm_client=llm_client)
     store = TicketStore(db_path)

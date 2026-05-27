@@ -92,6 +92,20 @@ endobj
             self.assertIn("duplicate charge invoice evidence", article.content)
             self.assertEqual(matches[0].article.id, "kb-pdf-refunds")
 
+    def test_pdf_loader_uses_ocr_text_sidecar_for_scanned_pdf(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            (base / "scan.pdf").write_bytes(b"%PDF-1.4\n%%EOF\n")
+            (base / "scan.txt").write_text(
+                "Scanned refund policy says duplicate charges need invoice evidence.",
+                encoding="utf-8",
+            )
+
+            knowledge_base = KnowledgeBase.from_path(base)
+            article = knowledge_base.articles[0]
+
+            self.assertIn("Scanned refund policy", article.content)
+
 
 if __name__ == "__main__":
     unittest.main()

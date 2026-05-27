@@ -61,6 +61,11 @@ class TicketStoreTest(unittest.TestCase):
             self.assertEqual(updated["trace"][5]["data"]["recommended_action"], "send_draft")
             self.assertEqual(loaded["approval"]["reviewer"], "lead@example.com")
             self.assertEqual(tickets[0]["approval_status"], "approved")
+            reviewers = store.list_reviewers()
+            audit_events = store.audit_log(ticket_id=result.ticket.id)
+            self.assertEqual(reviewers[0]["email"], "lead@example.com")
+            self.assertEqual(audit_events[0]["actor_email"], "lead@example.com")
+            self.assertEqual(audit_events[0]["action"], "approval.approved")
 
     def test_analytics_counts_routing_and_approval(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -89,6 +94,45 @@ class TicketStoreTest(unittest.TestCase):
             self.assertEqual(analytics["by_priority"]["high"], 1)
             self.assertEqual(analytics["by_owner_team"]["Revenue Operations"], 1)
             self.assertEqual(analytics["by_approval_status"]["escalated"], 1)
+
+    def test_manages_reviewer_accounts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = TicketStore(Path(temp_dir) / "desk.sqlite3")
+
+            reviewer = store.upsert_reviewer(
+                email="Lead@Example.com",
+                display_name="Support Lead",
+                role="manager",
+            )
+            reviewers = store.list_reviewers()
+
+            self.assertEqual(reviewer["email"], "lead@example.com")
+            self.assertEqual(reviewer["display_name"], "Support Lead")
+            self.assertEqual(reviewers[0]["role"], "manager")
+
+    def test_tracks_oauth_install_lifecycle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = TicketStore(Path(temp_dir) / "desk.sqlite3")
+            pending = store.begin_oauth_install(
+                provider="gmail",
+                state="state-123",
+                authorization_url="https://accounts.example/auth",
+                redirect_uri="https://desk.example/oauth/gmail/callback",
+                scopes=["mail.read"],
+                installed_by="lead@example.com",
+            )
+            completed = store.complete_oauth_install(
+                "state-123",
+                "code-456",
+                metadata={"workspace": "support"},
+                token={"access_token": "redacted"},
+            )
+
+            self.assertEqual(pending["status"], "pending")
+            self.assertEqual(completed["status"], "connected")
+            self.assertTrue(completed["has_code"])
+            self.assertTrue(completed["has_token"])
+            self.assertEqual(store.list_oauth_installs()[0]["provider"], "gmail")
 
 
 if __name__ == "__main__":

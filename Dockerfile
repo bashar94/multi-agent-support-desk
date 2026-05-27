@@ -10,6 +10,9 @@ WORKDIR /app
 
 COPY . /app
 
+ARG SUPPORT_DESK_EXTRAS=""
+RUN if [ -n "$SUPPORT_DESK_EXTRAS" ]; then pip install --no-cache-dir ".[${SUPPORT_DESK_EXTRAS}]"; fi
+
 EXPOSE 8080
 
 CMD ["python", "-m", "supportdesk.server"]

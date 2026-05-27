@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shlex
+import subprocess
+import tempfile
 import zlib
 from pathlib import Path
 
@@ -115,7 +119,9 @@ def _article_from_pdf(pdf_path: Path, root: Path) -> KnowledgeArticle:
     relative_id = pdf_path.relative_to(root).with_suffix("").as_posix()
     content = _extract_pdf_text(pdf_path)
     if not content:
-        content = "No extractable text found. Use searchable text PDFs for best results."
+        content = _extract_ocr_text(pdf_path)
+    if not content:
+        content = "No extractable text found. Add a .txt OCR sidecar or configure SUPPORT_DESK_OCR_COMMAND."
 
     return KnowledgeArticle(
         id=str(metadata.get("id") or _slugify(relative_id)),
@@ -213,6 +219,32 @@ def _extract_pdf_text(path: Path) -> str:
         chunks.extend(_pdf_hex_strings(decoded))
 
     return _clean_pdf_text(" ".join(chunks))
+
+
+def _extract_ocr_text(path: Path) -> str:
+    sidecar = path.with_suffix(".txt")
+    if sidecar.exists():
+        return _clean_pdf_text(sidecar.read_text(encoding="utf-8", errors="ignore"))
+
+    command_template = os.environ.get("SUPPORT_DESK_OCR_COMMAND", "").strip()
+    if not command_template:
+        return ""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_path = Path(temp_dir) / f"{path.stem}.txt"
+        command = command_template.format(input=str(path), output=str(output_path))
+        completed = subprocess.run(
+            shlex.split(command),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=int(os.environ.get("SUPPORT_DESK_OCR_TIMEOUT", "30")),
+        )
+        if output_path.exists():
+            return _clean_pdf_text(output_path.read_text(encoding="utf-8", errors="ignore"))
+        if completed.returncode == 0 and completed.stdout.strip():
+            return _clean_pdf_text(completed.stdout)
+    return ""
 
 
 def _pdf_literal_strings(content: str) -> list[str]:

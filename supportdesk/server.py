@@ -18,6 +18,7 @@ from supportdesk.adapters import (
     ticket_from_slack_payload,
     ticket_from_zendesk_payload,
 )
+from supportdesk.database import build_ticket_store
 from supportdesk.defaults import (
     DEFAULT_DB_PATH,
     DEFAULT_HOST,
@@ -29,13 +30,13 @@ from supportdesk.defaults import (
 from supportdesk.knowledge import KnowledgeBase
 from supportdesk.llm import OpenAICompatibleClient
 from supportdesk.models import Ticket
+from supportdesk.oauth import begin_oauth_install, list_oauth_providers
 from supportdesk.orchestrator import SupportDeskOrchestrator
-from supportdesk.storage import TicketStore
 
 
 class SupportDeskHandler(BaseHTTPRequestHandler):
     orchestrator: SupportDeskOrchestrator
-    store: TicketStore
+    store: Any
     knowledge_base: KnowledgeBase
     sample_tickets_path: Path
     static_dir: Path
@@ -72,6 +73,42 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
                 self._send_json({"analytics": self.store.analytics()})
                 return
 
+            if path == "/api/oauth/providers":
+                self._send_json({"providers": list_oauth_providers()})
+                return
+
+            if path == "/api/oauth/installs":
+                self._send_json({"installs": self.store.list_oauth_installs()})
+                return
+
+            if path == "/api/reviewers":
+                self._send_json({"reviewers": self.store.list_reviewers()})
+                return
+
+            if path == "/api/audit-log":
+                limit = int(query.get("limit", ["100"])[0])
+                ticket_id = str(query.get("ticket_id", [""])[0])
+                self._send_json({"events": self.store.audit_log(ticket_id=ticket_id, limit=limit)})
+                return
+
+            if path.startswith("/api/oauth/") and path.endswith("/callback"):
+                provider = path.removeprefix("/api/oauth/").removesuffix("/callback").strip("/")
+                code = str(query.get("code", [""])[0])
+                state = str(query.get("state", [""])[0])
+                if not code or not state:
+                    self._send_json({"error": "code and state are required"}, HTTPStatus.BAD_REQUEST)
+                    return
+                install = self.store.complete_oauth_install(
+                    state,
+                    code,
+                    metadata={"provider": provider, "callback_method": "GET"},
+                )
+                if install is None:
+                    self._send_json({"error": "OAuth install state not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json({"install": install})
+                return
+
             if path.startswith("/api/tickets/"):
                 ticket_id = path.removeprefix("/api/tickets/").strip("/")
                 result = self.store.get_result(ticket_id)
@@ -95,6 +132,58 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
                 ticket = Ticket.from_payload(payload)
                 result = self.orchestrator.run(ticket)
                 self._send_json(self.store.save_result(result), HTTPStatus.CREATED)
+                return
+
+            if path.startswith("/api/oauth/") and path.endswith("/begin"):
+                provider = path.removeprefix("/api/oauth/").removesuffix("/begin").strip("/")
+                payload = self._read_payload()
+                redirect_uri = str(payload.get("redirect_uri") or self._default_redirect_uri(provider))
+                scopes = payload.get("scopes")
+                selected_scopes = [str(scope) for scope in scopes] if isinstance(scopes, list) else None
+                extra_params = payload.get("extra_params")
+                if not isinstance(extra_params, dict):
+                    extra_params = {}
+                flow = begin_oauth_install(provider, redirect_uri, selected_scopes, extra_params)
+                install = self.store.begin_oauth_install(
+                    provider=flow["provider"],
+                    state=flow["state"],
+                    authorization_url=flow["authorization_url"],
+                    redirect_uri=flow["redirect_uri"],
+                    scopes=flow["scopes"],
+                    installed_by=str(payload.get("installed_by", "")),
+                    metadata={"source": "api"},
+                )
+                self._send_json({"install": install}, HTTPStatus.CREATED)
+                return
+
+            if path.startswith("/api/oauth/") and path.endswith("/callback"):
+                provider = path.removeprefix("/api/oauth/").removesuffix("/callback").strip("/")
+                payload = self._read_payload()
+                code = str(payload.get("code", ""))
+                state = str(payload.get("state", ""))
+                if not code or not state:
+                    self._send_json({"error": "code and state are required"}, HTTPStatus.BAD_REQUEST)
+                    return
+                install = self.store.complete_oauth_install(
+                    state,
+                    code,
+                    metadata={"provider": provider, "callback_method": "POST"},
+                )
+                if install is None:
+                    self._send_json({"error": "OAuth install state not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json({"install": install})
+                return
+
+            if path == "/api/reviewers":
+                payload = self._read_payload()
+                reviewer = self.store.upsert_reviewer(
+                    email=str(payload.get("email", "")),
+                    display_name=str(payload.get("display_name", "")),
+                    role=str(payload.get("role", "reviewer")),
+                    active=bool(payload.get("active", True)),
+                )
+                self._send_json({"reviewer": reviewer}, HTTPStatus.CREATED)
                 return
 
             if path == "/api/integrations/slack":
@@ -153,6 +242,7 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
                     status=str(payload.get("status", "")),
                     reviewer=str(payload.get("reviewer", "")),
                     note=str(payload.get("note", "")),
+                    actor=str(payload.get("actor", "")),
                 )
                 if result is None:
                     self._send_json({"error": "ticket not found"}, HTTPStatus.NOT_FOUND)
@@ -180,6 +270,11 @@ class SupportDeskHandler(BaseHTTPRequestHandler):
             parsed = parse_qs(raw, keep_blank_values=True)
             return {key: values[-1] if len(values) == 1 else values for key, values in parsed.items()}
         return json.loads(raw)
+
+    def _default_redirect_uri(self, provider: str) -> str:
+        scheme = self.headers.get("X-Forwarded-Proto", "http").split(",", 1)[0]
+        host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host", "")
+        return f"{scheme}://{host}/api/oauth/{provider}/callback"
 
     def _serve_static(self, path: str) -> None:
         requested = "index.html" if path in {"", "/"} else path.lstrip("/")
@@ -232,7 +327,7 @@ def build_handler(
     knowledge_base = KnowledgeBase.from_path(configured_knowledge_path)
     llm_client = OpenAICompatibleClient.from_env() if _use_llm() else None
     orchestrator = SupportDeskOrchestrator(knowledge_base, llm_client=llm_client)
-    store = TicketStore(db_path)
+    store = build_ticket_store(db_path)
 
     class ConfiguredSupportDeskHandler(SupportDeskHandler):
         pass

@@ -9,6 +9,9 @@ authors = [{ name = "Multi-Agent Support Desk contributors" }]
 keywords = ["agents", "support", "triage", "automation", "sqlite"]
 dependencies = []
 
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1"]
+
 [project.scripts]
 supportdesk = "supportdesk.server:run"
 
